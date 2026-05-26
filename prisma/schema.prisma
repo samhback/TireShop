@@ -1,0 +1,256 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model EmployeeLogin {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  isAdmin   Boolean  @default(false) @map("is_admin")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("employee-logins")
+}
+
+model EmployeeProfile {
+  id                 Int             @id @default(autoincrement())
+  name               String
+  phone              String?
+  email              String?
+  quotedOrders       Order[]
+  performedLineItems OrderLineItem[]
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  @@index([name])
+  @@index([phone])
+  @@index([email])
+  @@map("employee-profiles")
+}
+
+model InventoryItem {
+  id                Int             @id @default(autoincrement())
+  category          String
+  name              String
+  partNumber        String?         @map("part_number")
+  brand             String?
+  quantity          Int
+  cost              Decimal         @db.Decimal(10, 2)
+  sellPrice         Decimal         @map("sell_price") @db.Decimal(10, 2)
+  lowStockThreshold Int             @default(0) @map("low_stock_threshold")
+  notes             String?
+  tireSize          String?         @map("tire_size")
+  model             String?
+  loadRating        String?         @map("load_rating")
+  oilWeight         String?         @map("oil_weight")
+  oilType           String?         @map("oil_type")
+  packageSize       String?         @map("package_size")
+  fluidType         String?         @map("fluid_type")
+  specification     String?
+  filterType        String?         @map("filter_type")
+  fitment           String?
+  batteryGroup      String?         @map("battery_group")
+  cca               String?
+  warranty          String?
+  brakeComponent    String?         @map("brake_component")
+  position          String?
+  itemType          String?         @map("item_type")
+  sizeOrBulbNumber  String?         @map("size_or_bulb_number")
+  supplyType        String?         @map("supply_type")
+  unit              String?
+  storageLocation   String?         @map("storage_location")
+  partType          String?         @map("part_type")
+  orderLineItems    OrderLineItem[]
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([partNumber])
+  @@map("inventory-items")
+}
+
+model ServiceItem {
+  id             Int             @id @default(autoincrement())
+  category       String
+  name           String
+  description    String?
+  pricingMethod  String          @map("pricing_method")
+  flatPrice      Decimal?        @map("flat_price") @db.Decimal(10, 2)
+  hourlyRate     Decimal?        @map("hourly_rate") @db.Decimal(10, 2)
+  estimatedHours Decimal?        @map("estimated_hours") @db.Decimal(5, 2)
+  active         Boolean         @default(true)
+  notes          String?
+  orderLineItems OrderLineItem[]
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([name])
+  @@map("service-items")
+}
+
+model Customer {
+  id                     Int       @id @default(autoincrement())
+  firstName              String    @map("first_name")
+  lastName               String    @map("last_name")
+  phone                  String
+  email                  String?
+  address                String?
+  city                   String?
+  state                  String?
+  zip                    String?
+  preferredContactMethod String?   @map("preferred_contact_method")
+  notes                  String?
+  vehicles               Vehicle[]
+  orders                 Order[]
+  invoices               Invoice[]
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  @@index([lastName])
+  @@index([phone])
+  @@map("customers")
+}
+
+model Vehicle {
+  id                  Int       @id @default(autoincrement())
+  customerId          Int       @map("customer_id")
+  customer            Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  year                String
+  make                String
+  model               String
+  trim                String?
+  vin                 String?
+  licensePlate        String?   @map("license_plate")
+  plateState          String?   @map("plate_state")
+  color               String?
+  mileage             Int?
+  engineSize          String?   @map("engine_size")
+  transmission        String?
+  transmissionType    String?   @map("transmission_type")
+  transmissionDetails String?   @map("transmission_details")
+  fuelType            String?   @map("fuel_type")
+  driveType           String?   @map("drive_type")
+  tireSize            String?   @map("tire_size")
+  notes               String?
+  orders              Order[]
+  invoices            Invoice[]
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  @@index([customerId])
+  @@index([vin])
+  @@index([licensePlate])
+  @@map("vehicles")
+}
+
+model Order {
+  id                   Int              @id @default(autoincrement())
+  orderNumber          String           @unique @map("order_number")
+  status               String           @default("draft")
+  customerId           Int              @map("customer_id")
+  customer             Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  vehicleId            Int?             @map("vehicle_id")
+  vehicle              Vehicle?         @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  notes                String?
+  createdBy            String?          @map("created_by")
+  quotedByEmployeeId   Int?             @map("quoted_by_employee_id")
+  quotedByEmployee     EmployeeProfile? @relation(fields: [quotedByEmployeeId], references: [id], onDelete: SetNull)
+  lineItems            OrderLineItem[]
+  quoteAcceptedAt      DateTime?        @map("quote_accepted_at")
+  quoteRejectedAt      DateTime?        @map("quote_rejected_at")
+  quoteRejectionReason String?          @map("quote_rejection_reason")
+  canceledAt           DateTime?        @map("canceled_at")
+  cancellationReason   String?          @map("cancellation_reason")
+  completedAt          DateTime?        @map("completed_at")
+  invoice              Invoice?
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+
+  @@index([orderNumber])
+  @@index([status])
+  @@index([customerId])
+  @@index([vehicleId])
+  @@index([quotedByEmployeeId])
+  @@map("orders")
+}
+
+model OrderLineItem {
+  id                    Int              @id @default(autoincrement())
+  orderId               Int              @map("order_id")
+  order                 Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lineType              String           @map("line_type")
+  serviceItemId         Int?             @map("service_item_id")
+  serviceItem           ServiceItem?     @relation(fields: [serviceItemId], references: [id], onDelete: SetNull)
+  inventoryItemId       Int?             @map("inventory_item_id")
+  inventoryItem         InventoryItem?   @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  performedByEmployeeId Int?             @map("performed_by_employee_id")
+  performedByEmployee   EmployeeProfile? @relation(fields: [performedByEmployeeId], references: [id], onDelete: SetNull)
+  description           String
+  quantity              Decimal          @db.Decimal(10, 2)
+  unitPrice             Decimal          @map("unit_price") @db.Decimal(10, 2)
+  discountPercent       Decimal          @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  complementary         Boolean          @default(false)
+  lineTotal             Decimal          @map("line_total") @db.Decimal(10, 2)
+  notes                 String?
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
+
+  @@index([orderId])
+  @@index([lineType])
+  @@index([performedByEmployeeId])
+  @@map("order-line-items")
+}
+
+model Invoice {
+  id             Int               @id @default(autoincrement())
+  invoiceNumber  String            @unique @map("invoice_number")
+  orderId        Int               @unique @map("order_id")
+  order          Order             @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  customerId     Int               @map("customer_id")
+  customer       Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  vehicleId      Int?              @map("vehicle_id")
+  vehicle        Vehicle?          @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  status         String            @default("unpaid")
+  subtotal       Decimal           @db.Decimal(10, 2)
+  total          Decimal           @db.Decimal(10, 2)
+  paidAt         DateTime?         @map("paid_at")
+  paidByUsername String?           @map("paid_by_username")
+  lineItems      InvoiceLineItem[]
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  @@index([invoiceNumber])
+  @@index([customerId])
+  @@index([vehicleId])
+  @@index([status])
+  @@index([paidAt])
+  @@map("invoices")
+}
+
+model InvoiceLineItem {
+  id              Int      @id @default(autoincrement())
+  invoiceId       Int      @map("invoice_id")
+  invoice         Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  lineType        String   @map("line_type")
+  description     String
+  quantity        Decimal  @db.Decimal(10, 2)
+  unitPrice       Decimal  @map("unit_price") @db.Decimal(10, 2)
+  discountPercent Decimal  @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  complementary   Boolean  @default(false)
+  lineTotal       Decimal  @map("line_total") @db.Decimal(10, 2)
+  notes           String?
+  performedByName String?  @map("performed_by_name")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([invoiceId])
+  @@index([lineType])
+  @@map("invoice-line-items")
+}

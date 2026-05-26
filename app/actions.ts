@@ -1,0 +1,2116 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import {
+  clearEmployeeSession,
+  getEmployeeSession,
+  setEmployeeSession,
+} from "@/lib/session";
+import { getInventoryCategory } from "@/lib/inventoryCategories";
+import { normalizeUsername } from "@/lib/usernames";
+
+async function currentEmployeeIsAdmin() {
+  const currentEmployee = await getEmployeeSession();
+
+  if (!currentEmployee) {
+    return false;
+  }
+
+  const employee = await prisma.employeeLogin.findUnique({
+    where: {
+      username: normalizeUsername(currentEmployee),
+    },
+    select: {
+      isAdmin: true,
+    },
+  });
+
+  return employee?.isAdmin === true;
+}
+
+export async function loginEmployee(formData: FormData) {
+  const username = normalizeUsername(String(formData.get("username") ?? ""));
+  const password = String(formData.get("password") ?? "");
+
+  const employee = await prisma.employeeLogin.findUnique({
+    where: { username },
+  });
+
+  if (!employee || employee.password !== password) {
+    redirect("/?error=invalid");
+  }
+
+  await setEmployeeSession(employee.username);
+  redirect("/employee-home");
+}
+
+export async function logoutEmployee() {
+  await clearEmployeeSession();
+  redirect("/");
+}
+
+export async function createEmployeeLogin(formData: FormData) {
+  if (!(await currentEmployeeIsAdmin())) {
+    redirect("/employee-home");
+  }
+
+  const username = normalizeUsername(String(formData.get("username") ?? ""));
+  const password = String(formData.get("password") ?? "");
+
+  if (!username || !password) {
+    redirect("/admin?error=missing");
+  }
+
+  try {
+    await prisma.employeeLogin.create({
+      data: {
+        username,
+        password,
+        isAdmin: false,
+      },
+    });
+  } catch {
+    redirect("/admin?error=exists");
+  }
+
+  redirect("/admin?created=1");
+}
+
+export async function deleteEmployeeLogin(formData: FormData) {
+  if (!(await currentEmployeeIsAdmin())) {
+    redirect("/employee-home");
+  }
+
+  const employeeId = Number(formData.get("employeeId"));
+
+  if (!Number.isInteger(employeeId)) {
+    redirect("/admin?error=delete");
+  }
+
+  const employee = await prisma.employeeLogin.findUnique({
+    where: {
+      id: employeeId,
+    },
+    select: {
+      isAdmin: true,
+      username: true,
+    },
+  });
+
+  if (!employee || normalizeUsername(employee.username) === "admin") {
+    redirect("/admin?error=protected");
+  }
+
+  await prisma.employeeLogin.delete({
+    where: {
+      id: employeeId,
+    },
+  });
+
+  redirect("/admin?deleted=1");
+}
+
+export async function promoteEmployeeToAdmin(formData: FormData) {
+  if (!(await currentEmployeeIsAdmin())) {
+    redirect("/employee-home");
+  }
+
+  const employeeId = Number(formData.get("employeeId"));
+
+  if (!Number.isInteger(employeeId)) {
+    redirect("/admin?error=promote");
+  }
+
+  await prisma.employeeLogin.update({
+    where: {
+      id: employeeId,
+    },
+    data: {
+      isAdmin: true,
+    },
+  });
+
+  redirect("/admin?promoted=1");
+}
+
+export async function createEmployeeProfile(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const name = String(formData.get("name") ?? "").trim();
+
+  if (!name) {
+    redirect("/employees/add?error=invalid");
+  }
+
+  await prisma.employeeProfile.create({
+    data: {
+      name,
+      phone: nullableValue(formData, "phone"),
+      email: nullableValue(formData, "email"),
+    },
+  });
+
+  redirect("/employees/add?created=1");
+}
+
+export async function updateEmployeeProfile(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const employeeId = Number(formData.get("employeeId"));
+  const name = String(formData.get("name") ?? "").trim();
+
+  if (!Number.isInteger(employeeId) || !name) {
+    redirect(`/employees/${employeeId || ""}/edit?error=invalid`);
+  }
+
+  await prisma.employeeProfile.update({
+    where: {
+      id: employeeId,
+    },
+    data: {
+      name,
+      phone: nullableValue(formData, "phone"),
+      email: nullableValue(formData, "email"),
+    },
+  });
+
+  redirect("/employees?updated=1");
+}
+
+export async function searchEmployeeProfiles(query: string) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    return [];
+  }
+
+  const normalizedQuery = query.trim();
+
+  if (normalizedQuery.length < 2) {
+    return [];
+  }
+
+  const contains = {
+    contains: normalizedQuery,
+    mode: Prisma.QueryMode.insensitive,
+  };
+
+  const employees = await prisma.employeeProfile.findMany({
+    where: {
+      OR: [{ name: contains }, { phone: contains }, { email: contains }],
+    },
+    orderBy: {
+      name: "asc",
+    },
+    take: 50,
+  });
+
+  return employees.map((profile) => ({
+    id: profile.id,
+    name: profile.name,
+    phone: profile.phone,
+    email: profile.email,
+  }));
+}
+
+function nullableValue(formData: FormData, key: string) {
+  const value = String(formData.get(key) ?? "").trim();
+  return value || null;
+}
+
+function createOrderNumber() {
+  return `HSC-${Date.now().toString(36).toUpperCase()}`;
+}
+
+function createInvoiceNumber() {
+  return `INV-${Date.now().toString(36).toUpperCase()}`;
+}
+
+function orderLineTotal(
+  quantity: number,
+  unitPrice: number,
+  discountPercent = 0,
+  complementary = false,
+) {
+  if (complementary) {
+    return 0;
+  }
+
+  const subtotal = quantity * unitPrice;
+  const discountMultiplier = 1 - discountPercent / 100;
+
+  return Number((subtotal * discountMultiplier).toFixed(2));
+}
+
+type QuickInvoiceLineInput = {
+  id?: unknown;
+  quantity?: unknown;
+};
+
+function parseQuickInvoiceLines(value: FormDataEntryValue | null) {
+  if (typeof value !== "string" || !value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    const lines = parsed
+      .map((line: QuickInvoiceLineInput) => ({
+        id: Number(line.id),
+        quantity: Number(line.quantity),
+      }))
+      .filter(
+        (line) =>
+          Number.isInteger(line.id) &&
+          line.id > 0 &&
+          !Number.isNaN(line.quantity) &&
+          line.quantity > 0,
+      );
+
+    return lines.reduce<{ id: number; quantity: number }[]>((merged, line) => {
+      const existingLine = merged.find((item) => item.id === line.id);
+
+      if (existingLine) {
+        existingLine.quantity += line.quantity;
+      } else {
+        merged.push(line);
+      }
+
+      return merged;
+    }, []);
+  } catch {
+    return [];
+  }
+}
+
+function splitCustomerName(customerName: string) {
+  const nameParts = customerName.trim().split(/\s+/).filter(Boolean);
+
+  if (nameParts.length === 0) {
+    return null;
+  }
+
+  if (nameParts.length === 1) {
+    return {
+      firstName: nameParts[0],
+      lastName: "Walk-In",
+    };
+  }
+
+  return {
+    firstName: nameParts[0],
+    lastName: nameParts.slice(1).join(" "),
+  };
+}
+
+async function orderHasVehicle(orderId: number) {
+  const order = await prisma.order.findUnique({
+    where: {
+      id: orderId,
+    },
+    select: {
+      vehicleId: true,
+    },
+  });
+
+  return Boolean(order?.vehicleId);
+}
+
+export async function createInventoryItem(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const category = String(formData.get("category") ?? "").trim();
+  const categoryConfig = getInventoryCategory(category);
+  const name = String(formData.get("name") ?? "").trim();
+  const quantity = Number(formData.get("quantity"));
+  const cost = Number(formData.get("cost"));
+  const sellPrice = Number(formData.get("sellPrice"));
+  const lowStockThreshold = Number(formData.get("lowStockThreshold") || 0);
+
+  if (
+    !categoryConfig ||
+    !name ||
+    !Number.isInteger(quantity) ||
+    quantity < 0 ||
+    Number.isNaN(cost) ||
+    cost < 0 ||
+    Number.isNaN(sellPrice) ||
+    sellPrice < 0 ||
+    !Number.isInteger(lowStockThreshold) ||
+    lowStockThreshold < 0
+  ) {
+    redirect(`/inventory/add/${category || "tires"}?error=invalid`);
+  }
+
+  await prisma.inventoryItem.create({
+    data: {
+      category,
+      name,
+      partNumber: nullableValue(formData, "partNumber"),
+      brand: nullableValue(formData, "brand"),
+      quantity,
+      cost,
+      sellPrice,
+      lowStockThreshold,
+      notes: nullableValue(formData, "notes"),
+      tireSize: nullableValue(formData, "tireSize"),
+      model: nullableValue(formData, "model"),
+      loadRating: nullableValue(formData, "loadRating"),
+      oilWeight: nullableValue(formData, "oilWeight"),
+      oilType: nullableValue(formData, "oilType"),
+      packageSize: nullableValue(formData, "packageSize"),
+      fluidType: nullableValue(formData, "fluidType"),
+      specification: nullableValue(formData, "specification"),
+      filterType: nullableValue(formData, "filterType"),
+      fitment: nullableValue(formData, "fitment"),
+      batteryGroup: nullableValue(formData, "batteryGroup"),
+      cca: nullableValue(formData, "cca"),
+      warranty: nullableValue(formData, "warranty"),
+      brakeComponent: nullableValue(formData, "brakeComponent"),
+      position: nullableValue(formData, "position"),
+      itemType: nullableValue(formData, "itemType"),
+      sizeOrBulbNumber: nullableValue(formData, "sizeOrBulbNumber"),
+      supplyType: nullableValue(formData, "supplyType"),
+      unit: nullableValue(formData, "unit"),
+      storageLocation: nullableValue(formData, "storageLocation"),
+      partType: nullableValue(formData, "partType"),
+    },
+  });
+
+  redirect(`/inventory/add/${category}?created=1`);
+}
+
+export async function updateInventoryItem(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const itemId = Number(formData.get("itemId"));
+  const category = String(formData.get("category") ?? "").trim();
+  const categoryConfig = getInventoryCategory(category);
+  const name = String(formData.get("name") ?? "").trim();
+  const quantity = Number(formData.get("quantity"));
+  const cost = Number(formData.get("cost"));
+  const sellPrice = Number(formData.get("sellPrice"));
+  const lowStockThreshold = Number(formData.get("lowStockThreshold") || 0);
+
+  if (
+    !Number.isInteger(itemId) ||
+    !categoryConfig ||
+    !name ||
+    !Number.isInteger(quantity) ||
+    quantity < 0 ||
+    Number.isNaN(cost) ||
+    cost < 0 ||
+    Number.isNaN(sellPrice) ||
+    sellPrice < 0 ||
+    !Number.isInteger(lowStockThreshold) ||
+    lowStockThreshold < 0
+  ) {
+    redirect(`/inventory/${itemId || ""}/edit?error=invalid`);
+  }
+
+  await prisma.inventoryItem.update({
+    where: {
+      id: itemId,
+    },
+    data: {
+      category,
+      name,
+      partNumber: nullableValue(formData, "partNumber"),
+      brand: nullableValue(formData, "brand"),
+      quantity,
+      cost,
+      sellPrice,
+      lowStockThreshold,
+      notes: nullableValue(formData, "notes"),
+      tireSize: nullableValue(formData, "tireSize"),
+      model: nullableValue(formData, "model"),
+      loadRating: nullableValue(formData, "loadRating"),
+      oilWeight: nullableValue(formData, "oilWeight"),
+      oilType: nullableValue(formData, "oilType"),
+      packageSize: nullableValue(formData, "packageSize"),
+      fluidType: nullableValue(formData, "fluidType"),
+      specification: nullableValue(formData, "specification"),
+      filterType: nullableValue(formData, "filterType"),
+      fitment: nullableValue(formData, "fitment"),
+      batteryGroup: nullableValue(formData, "batteryGroup"),
+      cca: nullableValue(formData, "cca"),
+      warranty: nullableValue(formData, "warranty"),
+      brakeComponent: nullableValue(formData, "brakeComponent"),
+      position: nullableValue(formData, "position"),
+      itemType: nullableValue(formData, "itemType"),
+      sizeOrBulbNumber: nullableValue(formData, "sizeOrBulbNumber"),
+      supplyType: nullableValue(formData, "supplyType"),
+      unit: nullableValue(formData, "unit"),
+      storageLocation: nullableValue(formData, "storageLocation"),
+      partType: nullableValue(formData, "partType"),
+    },
+  });
+
+  redirect("/inventory?updated=1");
+}
+
+export async function createServiceItem(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const category = String(formData.get("category") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  const pricingMethod = String(formData.get("pricingMethod") ?? "").trim();
+  const flatPrice = Number(formData.get("flatPrice"));
+  const hourlyRate = Number(formData.get("hourlyRate"));
+  const estimatedHoursValue = String(formData.get("estimatedHours") ?? "").trim();
+  const estimatedHours = estimatedHoursValue ? Number(estimatedHoursValue) : null;
+
+  const flatPriceInvalid =
+    pricingMethod === "flat" && (Number.isNaN(flatPrice) || flatPrice < 0);
+  const hourlyRateInvalid =
+    pricingMethod === "hourly" && (Number.isNaN(hourlyRate) || hourlyRate < 0);
+  const optionalNumbersInvalid =
+    estimatedHours !== null &&
+    (Number.isNaN(estimatedHours) || estimatedHours < 0);
+
+  if (
+    !category ||
+    !name ||
+    !["flat", "hourly"].includes(pricingMethod) ||
+    flatPriceInvalid ||
+    hourlyRateInvalid ||
+    optionalNumbersInvalid
+  ) {
+    redirect("/services/add?error=invalid");
+  }
+
+  await prisma.serviceItem.create({
+    data: {
+      category,
+      name,
+      description: nullableValue(formData, "description"),
+      pricingMethod,
+      flatPrice: pricingMethod === "flat" ? flatPrice : null,
+      hourlyRate: pricingMethod === "hourly" ? hourlyRate : null,
+      estimatedHours,
+      active: formData.get("active") === "on",
+      notes: nullableValue(formData, "notes"),
+    },
+  });
+
+  redirect("/services/add?created=1");
+}
+
+export async function updateServiceItem(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const serviceId = Number(formData.get("serviceId"));
+  const category = String(formData.get("category") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  const pricingMethod = String(formData.get("pricingMethod") ?? "").trim();
+  const flatPrice = Number(formData.get("flatPrice"));
+  const hourlyRate = Number(formData.get("hourlyRate"));
+  const estimatedHoursValue = String(formData.get("estimatedHours") ?? "").trim();
+  const estimatedHours = estimatedHoursValue ? Number(estimatedHoursValue) : null;
+
+  const flatPriceInvalid =
+    pricingMethod === "flat" && (Number.isNaN(flatPrice) || flatPrice < 0);
+  const hourlyRateInvalid =
+    pricingMethod === "hourly" && (Number.isNaN(hourlyRate) || hourlyRate < 0);
+  const optionalNumbersInvalid =
+    estimatedHours !== null &&
+    (Number.isNaN(estimatedHours) || estimatedHours < 0);
+
+  if (
+    !Number.isInteger(serviceId) ||
+    !category ||
+    !name ||
+    !["flat", "hourly"].includes(pricingMethod) ||
+    flatPriceInvalid ||
+    hourlyRateInvalid ||
+    optionalNumbersInvalid
+  ) {
+    redirect(`/services/${serviceId || ""}/edit?error=invalid`);
+  }
+
+  await prisma.serviceItem.update({
+    where: {
+      id: serviceId,
+    },
+    data: {
+      category,
+      name,
+      description: nullableValue(formData, "description"),
+      pricingMethod,
+      flatPrice: pricingMethod === "flat" ? flatPrice : null,
+      hourlyRate: pricingMethod === "hourly" ? hourlyRate : null,
+      estimatedHours,
+      active: formData.get("active") === "on",
+      notes: nullableValue(formData, "notes"),
+    },
+  });
+
+  redirect("/services?updated=1");
+}
+
+export async function searchServices(query: string) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    return [];
+  }
+
+  const normalizedQuery = query.trim();
+
+  if (normalizedQuery.length < 2) {
+    return [];
+  }
+
+  const contains = {
+    contains: normalizedQuery,
+    mode: Prisma.QueryMode.insensitive,
+  };
+
+  const services = await prisma.serviceItem.findMany({
+    where: {
+      OR: [
+        { name: contains },
+        { category: contains },
+        { description: contains },
+        { pricingMethod: contains },
+        { notes: contains },
+      ],
+    },
+    orderBy: [{ category: "asc" }, { name: "asc" }],
+    take: 50,
+  });
+
+  return services.map((service) => ({
+    id: service.id,
+    category: service.category,
+    name: service.name,
+    description: service.description,
+    pricingMethod: service.pricingMethod,
+    flatPrice: service.flatPrice?.toString() ?? null,
+    hourlyRate: service.hourlyRate?.toString() ?? null,
+    estimatedHours: service.estimatedHours?.toString() ?? null,
+    active: service.active,
+    notes: service.notes,
+  }));
+}
+
+export async function searchInventory(query: string) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    return [];
+  }
+
+  const normalizedQuery = query.trim();
+
+  if (normalizedQuery.length < 2) {
+    return [];
+  }
+
+  const contains = {
+    contains: normalizedQuery,
+    mode: Prisma.QueryMode.insensitive,
+  };
+
+  const items = await prisma.inventoryItem.findMany({
+    where: {
+      OR: [
+        { name: contains },
+        { partNumber: contains },
+        { brand: contains },
+        { category: contains },
+        { tireSize: contains },
+        { model: contains },
+        { loadRating: contains },
+        { oilWeight: contains },
+        { oilType: contains },
+        { fluidType: contains },
+        { specification: contains },
+        { filterType: contains },
+        { fitment: contains },
+        { batteryGroup: contains },
+        { cca: contains },
+        { brakeComponent: contains },
+        { position: contains },
+        { itemType: contains },
+        { sizeOrBulbNumber: contains },
+        { supplyType: contains },
+        { unit: contains },
+        { storageLocation: contains },
+        { partType: contains },
+      ],
+    },
+    orderBy: [{ category: "asc" }, { name: "asc" }],
+    take: 50,
+  });
+
+  return items.map((item) => ({
+    id: item.id,
+    category: item.category,
+    name: item.name,
+    partNumber: item.partNumber,
+    brand: item.brand,
+    quantity: item.quantity,
+    cost: item.cost.toString(),
+    sellPrice: item.sellPrice.toString(),
+    lowStockThreshold: item.lowStockThreshold,
+    tireSize: item.tireSize,
+    model: item.model,
+    loadRating: item.loadRating,
+    notes: item.notes,
+  }));
+}
+
+export async function createCustomer(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  if (!prisma.customer) {
+    throw new Error(
+      "Prisma client is missing the Customer model. Run `npx prisma generate` and restart the dev server.",
+    );
+  }
+
+  const firstName = String(formData.get("firstName") ?? "").trim();
+  const lastName = String(formData.get("lastName") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const year = String(formData.get("year") ?? "").trim();
+  const make = String(formData.get("make") ?? "").trim();
+  const model = String(formData.get("model") ?? "").trim();
+  const mileageValue = String(formData.get("mileage") ?? "").trim();
+  const mileage = mileageValue ? Number(mileageValue) : null;
+
+  if (
+    !firstName ||
+    !lastName ||
+    !phone ||
+    !year ||
+    !make ||
+    !model ||
+    (mileage !== null && (!Number.isInteger(mileage) || mileage < 0))
+  ) {
+    redirect("/customers/add?error=invalid");
+  }
+
+  await prisma.customer.create({
+    data: {
+      firstName,
+      lastName,
+      phone,
+      email: nullableValue(formData, "email"),
+      address: nullableValue(formData, "address"),
+      city: nullableValue(formData, "city"),
+      state: nullableValue(formData, "state"),
+      zip: nullableValue(formData, "zip"),
+      preferredContactMethod: nullableValue(formData, "preferredContactMethod"),
+      notes: nullableValue(formData, "customerNotes"),
+      vehicles: {
+        create: {
+          year,
+          make,
+          model,
+          trim: nullableValue(formData, "trim"),
+          vin: nullableValue(formData, "vin"),
+          licensePlate: nullableValue(formData, "licensePlate"),
+          plateState: nullableValue(formData, "plateState"),
+          color: nullableValue(formData, "color"),
+          mileage,
+          engineSize: nullableValue(formData, "engineSize"),
+          transmissionType: nullableValue(formData, "transmissionType"),
+          transmissionDetails: nullableValue(formData, "transmissionDetails"),
+          fuelType: nullableValue(formData, "fuelType"),
+          driveType: nullableValue(formData, "driveType"),
+          tireSize: nullableValue(formData, "tireSize"),
+          notes: nullableValue(formData, "vehicleNotes"),
+        },
+      },
+    },
+  });
+
+  redirect("/customers/add?created=1");
+}
+
+export async function searchCustomers(query: string) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    return [];
+  }
+
+  const normalizedQuery = query.trim();
+
+  if (normalizedQuery.length < 2) {
+    return [];
+  }
+
+  const contains = {
+    contains: normalizedQuery,
+    mode: Prisma.QueryMode.insensitive,
+  };
+
+  const customers = await prisma.customer.findMany({
+    where: {
+      OR: [
+        { firstName: contains },
+        { lastName: contains },
+        { phone: contains },
+        { email: contains },
+        { vehicles: {
+          some: {
+            OR: [
+              { year: contains },
+              { make: contains },
+              { model: contains },
+              { vin: contains },
+              { licensePlate: contains },
+              { color: contains },
+              { engineSize: contains },
+              { transmissionType: contains },
+              { transmissionDetails: contains },
+              { fuelType: contains },
+              { driveType: contains },
+              { tireSize: contains },
+            ],
+          },
+        } },
+      ],
+    },
+    include: {
+      vehicles: {
+        include: {
+          _count: {
+            select: {
+              invoices: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+        take: 3,
+      },
+    },
+    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    take: 50,
+  });
+
+  return customers.map((customer) => ({
+    id: customer.id,
+    firstName: customer.firstName,
+    lastName: customer.lastName,
+    phone: customer.phone,
+    email: customer.email,
+    notes: customer.notes,
+    vehicles: customer.vehicles.map((vehicle) => ({
+      id: vehicle.id,
+      year: vehicle.year,
+      make: vehicle.make,
+      model: vehicle.model,
+      vin: vehicle.vin,
+      licensePlate: vehicle.licensePlate,
+      color: vehicle.color,
+      mileage: vehicle.mileage,
+      engineSize: vehicle.engineSize,
+      transmissionType: vehicle.transmissionType,
+      transmissionDetails: vehicle.transmissionDetails,
+      fuelType: vehicle.fuelType,
+      driveType: vehicle.driveType,
+      tireSize: vehicle.tireSize,
+      historyCount: vehicle._count.invoices,
+    })),
+  }));
+}
+
+export async function createDraftOrderForCustomer(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const customerId = Number(formData.get("customerId"));
+
+  if (!Number.isInteger(customerId)) {
+    redirect("/orders/new?error=customer");
+  }
+
+  const customer = await prisma.customer.findUnique({
+    where: {
+      id: customerId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!customer) {
+    redirect("/orders/new?error=customer");
+  }
+
+  const order = await prisma.order.create({
+    data: {
+      orderNumber: createOrderNumber(),
+      status: "draft",
+      customerId,
+      createdBy: employee,
+    },
+  });
+
+  redirect(`/orders/${order.id}`);
+}
+
+export async function attachVehicleToOrder(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const orderId = Number(formData.get("orderId"));
+  const vehicleId = Number(formData.get("vehicleId"));
+
+  if (!Number.isInteger(orderId) || !Number.isInteger(vehicleId)) {
+    redirect(`/orders/${orderId || ""}?error=vehicle`);
+  }
+
+  const order = await prisma.order.findUnique({
+    where: {
+      id: orderId,
+    },
+    select: {
+      customerId: true,
+    },
+  });
+
+  const vehicle = await prisma.vehicle.findUnique({
+    where: {
+      id: vehicleId,
+    },
+    select: {
+      customerId: true,
+    },
+  });
+
+  if (!order || !vehicle || order.customerId !== vehicle.customerId) {
+    redirect(`/orders/${orderId}?error=vehicle`);
+  }
+
+  await prisma.order.update({
+    where: {
+      id: orderId,
+    },
+    data: {
+      vehicleId,
+    },
+  });
+
+  redirect(`/orders/${orderId}?vehicleAttached=1`);
+}
+
+export async function createVehicleForOrder(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const orderId = Number(formData.get("orderId"));
+  const customerId = Number(formData.get("customerId"));
+  const year = String(formData.get("year") ?? "").trim();
+  const make = String(formData.get("make") ?? "").trim();
+  const model = String(formData.get("model") ?? "").trim();
+  const mileageValue = String(formData.get("mileage") ?? "").trim();
+  const mileage = mileageValue ? Number(mileageValue) : null;
+
+  if (
+    !Number.isInteger(orderId) ||
+    !Number.isInteger(customerId) ||
+    !year ||
+    !make ||
+    !model ||
+    (mileage !== null && (!Number.isInteger(mileage) || mileage < 0))
+  ) {
+    redirect(`/orders/${orderId || ""}?error=vehicle`);
+  }
+
+  const order = await prisma.order.findUnique({
+    where: {
+      id: orderId,
+    },
+    select: {
+      customerId: true,
+    },
+  });
+
+  if (!order || order.customerId !== customerId) {
+    redirect(`/orders/${orderId}?error=vehicle`);
+  }
+
+  const vehicle = await prisma.vehicle.create({
+    data: {
+      customerId,
+      year,
+      make,
+      model,
+      trim: nullableValue(formData, "trim"),
+      vin: nullableValue(formData, "vin"),
+      licensePlate: nullableValue(formData, "licensePlate"),
+      plateState: nullableValue(formData, "plateState"),
+      color: nullableValue(formData, "color"),
+      mileage,
+      engineSize: nullableValue(formData, "engineSize"),
+      transmissionType: nullableValue(formData, "transmissionType"),
+      transmissionDetails: nullableValue(formData, "transmissionDetails"),
+      fuelType: nullableValue(formData, "fuelType"),
+      driveType: nullableValue(formData, "driveType"),
+      tireSize: nullableValue(formData, "tireSize"),
+      notes: nullableValue(formData, "vehicleNotes"),
+    },
+  });
+
+  await prisma.order.update({
+    where: {
+      id: orderId,
+    },
+    data: {
+      vehicleId: vehicle.id,
+    },
+  });
+
+  redirect(`/orders/${orderId}?vehicleAdded=1`);
+}
+
+export async function updateOrderQuotedBy(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const orderId = Number(formData.get("orderId"));
+  const quotedByEmployeeIdValue = String(
+    formData.get("quotedByEmployeeId") ?? "",
+  ).trim();
+  const quotedByEmployeeId = quotedByEmployeeIdValue
+    ? Number(quotedByEmployeeIdValue)
+    : null;
+
+  if (
+    !Number.isInteger(orderId) ||
+    (quotedByEmployeeId !== null && !Number.isInteger(quotedByEmployeeId))
+  ) {
+    redirect(`/orders/${orderId || ""}?error=quotedBy`);
+  }
+
+  await prisma.order.update({
+    where: {
+      id: orderId,
+    },
+    data: {
+      quotedByEmployeeId,
+    },
+  });
+
+  redirect(`/orders/${orderId}?quotedByUpdated=1`);
+}
+
+export async function searchOrders(query: string) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    return [];
+  }
+
+  const normalizedQuery = query.trim();
+
+  if (normalizedQuery.length < 2) {
+    return [];
+  }
+
+  const contains = {
+    contains: normalizedQuery,
+    mode: Prisma.QueryMode.insensitive,
+  };
+
+  const orders = await prisma.order.findMany({
+    where: {
+      OR: [
+        { orderNumber: contains },
+        { status: contains },
+        {
+          customer: {
+            OR: [
+              { firstName: contains },
+              { lastName: contains },
+              { phone: contains },
+              { email: contains },
+            ],
+          },
+        },
+        {
+          vehicle: {
+            OR: [
+              { year: contains },
+              { make: contains },
+              { model: contains },
+              { color: contains },
+              { vin: contains },
+              { licensePlate: contains },
+              { tireSize: contains },
+            ],
+          },
+        },
+      ],
+    },
+    include: {
+      customer: true,
+      vehicle: true,
+    },
+    orderBy: {
+      updatedAt: "desc",
+    },
+    take: 50,
+  });
+
+  return orders.map((order) => ({
+    id: order.id,
+    orderNumber: order.orderNumber,
+    status: order.status,
+    updatedAt: order.updatedAt.toISOString(),
+    customer: {
+      firstName: order.customer.firstName,
+      lastName: order.customer.lastName,
+      phone: order.customer.phone,
+    },
+    vehicle: order.vehicle
+      ? {
+          year: order.vehicle.year,
+          make: order.vehicle.make,
+          model: order.vehicle.model,
+          color: order.vehicle.color,
+          licensePlate: order.vehicle.licensePlate,
+        }
+      : null,
+  }));
+}
+
+export async function searchInvoices(query: string) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    return [];
+  }
+
+  const normalizedQuery = query.trim();
+
+  if (normalizedQuery.length < 2) {
+    return [];
+  }
+
+  const contains = {
+    contains: normalizedQuery,
+    mode: Prisma.QueryMode.insensitive,
+  };
+
+  const invoices = await prisma.invoice.findMany({
+    where: {
+      OR: [
+        { invoiceNumber: contains },
+        { status: contains },
+        {
+          order: {
+            orderNumber: contains,
+          },
+        },
+        {
+          customer: {
+            OR: [
+              { firstName: contains },
+              { lastName: contains },
+              { phone: contains },
+              { email: contains },
+            ],
+          },
+        },
+        {
+          vehicle: {
+            OR: [
+              { year: contains },
+              { make: contains },
+              { model: contains },
+              { color: contains },
+              { vin: contains },
+              { licensePlate: contains },
+              { tireSize: contains },
+            ],
+          },
+        },
+      ],
+    },
+    include: {
+      customer: true,
+      vehicle: true,
+      order: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: 50,
+  });
+
+  return invoices.map((invoice) => ({
+    id: invoice.id,
+    invoiceNumber: invoice.invoiceNumber,
+    orderNumber: invoice.order.orderNumber,
+    status: invoice.status,
+    total: invoice.total.toString(),
+    createdAt: invoice.createdAt.toISOString(),
+    paidAt: invoice.paidAt?.toISOString() ?? null,
+    paidByUsername: invoice.paidByUsername,
+    customer: {
+      firstName: invoice.customer.firstName,
+      lastName: invoice.customer.lastName,
+      phone: invoice.customer.phone,
+    },
+    vehicle: invoice.vehicle
+      ? {
+          year: invoice.vehicle.year,
+          make: invoice.vehicle.make,
+          model: invoice.vehicle.model,
+          color: invoice.vehicle.color,
+          licensePlate: invoice.vehicle.licensePlate,
+        }
+      : null,
+  }));
+}
+
+export async function acceptQuote(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const orderId = Number(formData.get("orderId"));
+
+  if (!Number.isInteger(orderId)) {
+    redirect(`/orders/${orderId || ""}?error=status`);
+  }
+
+  const order = await prisma.order.findUnique({
+    where: {
+      id: orderId,
+    },
+    select: {
+      quotedByEmployeeId: true,
+    },
+  });
+
+  if (!order?.quotedByEmployeeId) {
+    redirect(`/orders/${orderId}?error=quotedByRequired`);
+  }
+
+  await prisma.order.update({
+    where: {
+      id: orderId,
+    },
+    data: {
+      status: "approved",
+      quoteAcceptedAt: new Date(),
+      quoteRejectedAt: null,
+      quoteRejectionReason: null,
+    },
+  });
+
+  redirect(`/orders/${orderId}?quoteAccepted=1`);
+}
+
+export async function rejectQuote(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const orderId = Number(formData.get("orderId"));
+  const reason = String(formData.get("reason") ?? "").trim();
+
+  if (!Number.isInteger(orderId) || !reason) {
+    redirect(`/orders/${orderId || ""}?error=rejection`);
+  }
+
+  const order = await prisma.order.findUnique({
+    where: {
+      id: orderId,
+    },
+    select: {
+      quotedByEmployeeId: true,
+    },
+  });
+
+  if (!order?.quotedByEmployeeId) {
+    redirect(`/orders/${orderId}?error=quotedByRequired`);
+  }
+
+  await prisma.order.update({
+    where: {
+      id: orderId,
+    },
+    data: {
+      status: "rejected",
+      quoteRejectedAt: new Date(),
+      quoteRejectionReason: reason,
+    },
+  });
+
+  redirect(`/orders/${orderId}?quoteRejected=1`);
+}
+
+export async function cancelApprovedOrder(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const orderId = Number(formData.get("orderId"));
+  const reason = String(formData.get("reason") ?? "").trim();
+
+  if (!Number.isInteger(orderId) || !reason) {
+    redirect(`/orders/${orderId || ""}?error=cancellation`);
+  }
+
+  const order = await prisma.order.findUnique({
+    where: {
+      id: orderId,
+    },
+    select: {
+      status: true,
+      quotedByEmployeeId: true,
+    },
+  });
+
+  if (!order || order.status === "canceled") {
+    redirect(`/orders/${orderId}?error=status`);
+  }
+
+  if (!order.quotedByEmployeeId) {
+    redirect(`/orders/${orderId}?error=quotedByRequired`);
+  }
+
+  await prisma.order.update({
+    where: {
+      id: orderId,
+    },
+    data: {
+      status: "canceled",
+      canceledAt: new Date(),
+      cancellationReason: reason,
+    },
+  });
+
+  redirect("/employee-home");
+}
+
+export async function addServiceToOrder(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const orderId = Number(formData.get("orderId"));
+  const serviceId = Number(formData.get("serviceId"));
+
+  if (!Number.isInteger(orderId) || !Number.isInteger(serviceId)) {
+    redirect(`/orders/${orderId || ""}?error=lineItem`);
+  }
+
+  if (!(await orderHasVehicle(orderId))) {
+    redirect(`/orders/${orderId}?error=vehicleRequired`);
+  }
+
+  const service = await prisma.serviceItem.findUnique({
+    where: {
+      id: serviceId,
+    },
+  });
+
+  if (!service) {
+    redirect(`/orders/${orderId}?error=lineItem`);
+  }
+
+  const quantity =
+    service.pricingMethod === "hourly"
+      ? Number(service.estimatedHours?.toString() ?? "1")
+      : 1;
+  const unitPrice = Number(
+    service.pricingMethod === "hourly"
+      ? service.hourlyRate?.toString() ?? "0"
+      : service.flatPrice?.toString() ?? "0",
+  );
+
+  await prisma.orderLineItem.create({
+    data: {
+      orderId,
+      lineType: "service",
+      serviceItemId: service.id,
+      description: service.name,
+      quantity,
+      unitPrice,
+      lineTotal: orderLineTotal(quantity, unitPrice),
+      notes: service.description,
+    },
+  });
+
+  redirect(`/orders/${orderId}?lineAdded=1`);
+}
+
+export async function addInventoryToOrder(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const orderId = Number(formData.get("orderId"));
+  const inventoryItemId = Number(formData.get("inventoryItemId"));
+  const quantity = Number(formData.get("quantity"));
+
+  if (
+    !Number.isInteger(orderId) ||
+    !Number.isInteger(inventoryItemId) ||
+    !Number.isInteger(quantity) ||
+    quantity <= 0
+  ) {
+    redirect(`/orders/${orderId || ""}?error=lineItem`);
+  }
+
+  if (!(await orderHasVehicle(orderId))) {
+    redirect(`/orders/${orderId}?error=vehicleRequired`);
+  }
+
+  const item = await prisma.inventoryItem.findUnique({
+    where: {
+      id: inventoryItemId,
+    },
+  });
+
+  if (!item) {
+    redirect(`/orders/${orderId}?error=lineItem`);
+  }
+
+  const existingOrderLines = await prisma.orderLineItem.findMany({
+    where: {
+      orderId,
+      inventoryItemId,
+    },
+    select: {
+      quantity: true,
+    },
+  });
+  const reservedQuantity = existingOrderLines.reduce(
+    (total, line) => total + Number(line.quantity.toString()),
+    0,
+  );
+  const availableQuantity = item.quantity - reservedQuantity;
+
+  if (quantity > availableQuantity) {
+    redirect(`/orders/${orderId}?error=lineItem`);
+  }
+
+  const unitPrice = Number(item.sellPrice.toString());
+
+  await prisma.orderLineItem.create({
+    data: {
+      orderId,
+      lineType: "inventory",
+      inventoryItemId: item.id,
+      description: item.name,
+      quantity,
+      unitPrice,
+      lineTotal: orderLineTotal(quantity, unitPrice),
+      notes: [
+        item.brand,
+        item.partNumber ? `Part # ${item.partNumber}` : null,
+        item.tireSize,
+      ]
+        .filter(Boolean)
+        .join(" | ") || null,
+    },
+  });
+
+  redirect(`/orders/${orderId}?lineAdded=1`);
+}
+
+export async function addCustomLineToOrder(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const orderId = Number(formData.get("orderId"));
+  const description = String(formData.get("description") ?? "").trim();
+  const quantity = Number(formData.get("quantity"));
+  const unitPrice = Number(formData.get("unitPrice"));
+
+  if (
+    !Number.isInteger(orderId) ||
+    !description ||
+    Number.isNaN(quantity) ||
+    quantity <= 0 ||
+    Number.isNaN(unitPrice) ||
+    unitPrice < 0
+  ) {
+    redirect(`/orders/${orderId || ""}?error=lineItem`);
+  }
+
+  if (!(await orderHasVehicle(orderId))) {
+    redirect(`/orders/${orderId}?error=vehicleRequired`);
+  }
+
+  await prisma.orderLineItem.create({
+    data: {
+      orderId,
+      lineType: "custom",
+      description,
+      quantity,
+      unitPrice,
+      lineTotal: orderLineTotal(quantity, unitPrice),
+      notes: nullableValue(formData, "notes"),
+    },
+  });
+
+  redirect(`/orders/${orderId}?lineAdded=1`);
+}
+
+export async function removeOrderLineItem(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const orderId = Number(formData.get("orderId"));
+  const lineItemId = Number(formData.get("lineItemId"));
+
+  if (!Number.isInteger(orderId) || !Number.isInteger(lineItemId)) {
+    redirect(`/orders/${orderId || ""}?error=lineItem`);
+  }
+
+  await prisma.orderLineItem.delete({
+    where: {
+      id: lineItemId,
+    },
+  });
+
+  redirect(`/orders/${orderId}?lineRemoved=1`);
+}
+
+export async function updateOrderLineItemAdjustment(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const orderId = Number(formData.get("orderId"));
+  const lineItemId = Number(formData.get("lineItemId"));
+  const discountPercent = Number(formData.get("discountPercent") || 0);
+  const complementary = formData.get("complementary") === "on";
+
+  if (
+    !Number.isInteger(orderId) ||
+    !Number.isInteger(lineItemId) ||
+    Number.isNaN(discountPercent) ||
+    discountPercent < 0 ||
+    discountPercent > 100
+  ) {
+    redirect(`/orders/${orderId || ""}?error=lineItem`);
+  }
+
+  const lineItem = await prisma.orderLineItem.findUnique({
+    where: {
+      id: lineItemId,
+    },
+  });
+
+  if (
+    !lineItem ||
+    lineItem.orderId !== orderId ||
+    !["service", "inventory"].includes(lineItem.lineType)
+  ) {
+    redirect(`/orders/${orderId}?error=lineItem`);
+  }
+
+  const quantity = Number(lineItem.quantity.toString());
+  const unitPrice = Number(lineItem.unitPrice.toString());
+
+  await prisma.orderLineItem.update({
+    where: {
+      id: lineItemId,
+    },
+    data: {
+      complementary,
+      discountPercent: complementary ? 0 : discountPercent,
+      lineTotal: orderLineTotal(
+        quantity,
+        unitPrice,
+        complementary ? 0 : discountPercent,
+        complementary,
+      ),
+    },
+  });
+
+  redirect(`/orders/${orderId}?lineUpdated=1`);
+}
+
+export async function updateOrderLineItemPerformedBy(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const orderId = Number(formData.get("orderId"));
+  const lineItemId = Number(formData.get("lineItemId"));
+  const performedByEmployeeIdValue = String(
+    formData.get("performedByEmployeeId") ?? "",
+  ).trim();
+  const performedByEmployeeId = performedByEmployeeIdValue
+    ? Number(performedByEmployeeIdValue)
+    : null;
+
+  if (
+    !Number.isInteger(orderId) ||
+    !Number.isInteger(lineItemId) ||
+    (performedByEmployeeId !== null && !Number.isInteger(performedByEmployeeId))
+  ) {
+    redirect(`/orders/${orderId || ""}?error=performedBy`);
+  }
+
+  const lineItem = await prisma.orderLineItem.findUnique({
+    where: {
+      id: lineItemId,
+    },
+    select: {
+      orderId: true,
+      lineType: true,
+    },
+  });
+
+  if (!lineItem || lineItem.orderId !== orderId || lineItem.lineType !== "service") {
+    redirect(`/orders/${orderId}?error=performedBy`);
+  }
+
+  await prisma.orderLineItem.update({
+    where: {
+      id: lineItemId,
+    },
+    data: {
+      performedByEmployeeId,
+    },
+  });
+
+  redirect(`/orders/${orderId}?performedByUpdated=1`);
+}
+
+export async function completeOrder(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const orderId = Number(formData.get("orderId"));
+
+  if (!Number.isInteger(orderId)) {
+    redirect(`/orders/${orderId || ""}?error=complete`);
+  }
+
+  const order = await prisma.order.findUnique({
+    where: {
+      id: orderId,
+    },
+    include: {
+      invoice: true,
+      lineItems: {
+        include: {
+          performedByEmployee: true,
+        },
+      },
+    },
+  });
+
+  if (!order) {
+    redirect(`/orders/${orderId}?error=complete`);
+  }
+
+  if (order.invoice) {
+    redirect(`/invoices/${order.invoice.id}`);
+  }
+
+  if (
+    order.status !== "approved" ||
+    !order.vehicleId ||
+    !order.quotedByEmployeeId ||
+    order.lineItems.length === 0
+  ) {
+    redirect(`/orders/${orderId}?error=complete`);
+  }
+
+  const missingPerformedBy = order.lineItems.some(
+    (lineItem) =>
+      lineItem.lineType === "service" && !lineItem.performedByEmployeeId,
+  );
+
+  if (missingPerformedBy) {
+    redirect(`/orders/${orderId}?error=performedByRequired`);
+  }
+
+  const inventoryLines = order.lineItems.filter(
+    (lineItem) => lineItem.lineType === "inventory" && lineItem.inventoryItemId,
+  );
+
+  for (const lineItem of inventoryLines) {
+    const quantity = Number(lineItem.quantity.toString());
+    const item = await prisma.inventoryItem.findUnique({
+      where: {
+        id: lineItem.inventoryItemId!,
+      },
+      select: {
+        quantity: true,
+      },
+    });
+
+    if (!item || item.quantity < quantity) {
+      redirect(`/orders/${orderId}?error=inventory`);
+    }
+  }
+
+  const subtotal = order.lineItems.reduce(
+    (total, lineItem) => total + Number(lineItem.lineTotal.toString()),
+    0,
+  );
+
+  const invoice = await prisma.$transaction(async (tx) => {
+    for (const lineItem of inventoryLines) {
+      await tx.inventoryItem.update({
+        where: {
+          id: lineItem.inventoryItemId!,
+        },
+        data: {
+          quantity: {
+            decrement: Number(lineItem.quantity.toString()),
+          },
+        },
+      });
+    }
+
+    const createdInvoice = await tx.invoice.create({
+      data: {
+        invoiceNumber: createInvoiceNumber(),
+        orderId: order.id,
+        customerId: order.customerId,
+        vehicleId: order.vehicleId,
+        status: "unpaid",
+        subtotal,
+        total: subtotal,
+        lineItems: {
+          create: order.lineItems.map((lineItem) => ({
+            lineType: lineItem.lineType,
+            description: lineItem.description,
+            quantity: lineItem.quantity,
+            unitPrice: lineItem.unitPrice,
+            discountPercent: lineItem.discountPercent,
+            complementary: lineItem.complementary,
+            lineTotal: lineItem.lineTotal,
+            notes: lineItem.notes,
+            performedByName: lineItem.performedByEmployee?.name ?? null,
+          })),
+        },
+      },
+    });
+
+    await tx.order.update({
+      where: {
+        id: order.id,
+      },
+      data: {
+        status: "completed",
+        completedAt: new Date(),
+      },
+    });
+
+    return createdInvoice;
+  });
+
+  redirect(`/invoices/${invoice.id}`);
+}
+
+export async function createQuickInvoice(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const customerName = String(formData.get("customerName") ?? "").trim();
+  const quotedByEmployeeId = Number(formData.get("quotedByEmployeeId"));
+  const serviceLines = parseQuickInvoiceLines(formData.get("serviceLines"));
+  const inventoryLines = parseQuickInvoiceLines(formData.get("inventoryLines"));
+  const customerNameParts = splitCustomerName(customerName);
+
+  if (
+    !customerNameParts ||
+    !Number.isInteger(quotedByEmployeeId) ||
+    (serviceLines.length === 0 && inventoryLines.length === 0)
+  ) {
+    redirect("/invoices/quick?error=invalid");
+  }
+
+  const quotedByEmployee = await prisma.employeeProfile.findUnique({
+    where: {
+      id: quotedByEmployeeId,
+    },
+  });
+
+  if (!quotedByEmployee) {
+    redirect("/invoices/quick?error=invalid");
+  }
+
+  const serviceIds = serviceLines.map((line) => line.id);
+  const inventoryIds = inventoryLines.map((line) => line.id);
+
+  const [services, inventoryItems] = await Promise.all([
+    serviceIds.length
+      ? prisma.serviceItem.findMany({
+          where: {
+            id: {
+              in: serviceIds,
+            },
+          },
+        })
+      : Promise.resolve([]),
+    inventoryIds.length
+      ? prisma.inventoryItem.findMany({
+          where: {
+            id: {
+              in: inventoryIds,
+            },
+          },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  if (
+    services.length !== serviceIds.length ||
+    inventoryItems.length !== inventoryIds.length
+  ) {
+    redirect("/invoices/quick?error=invalid");
+  }
+
+  for (const inventoryLine of inventoryLines) {
+    const item = inventoryItems.find(
+      (inventoryItem) => inventoryItem.id === inventoryLine.id,
+    );
+
+    if (!item || item.quantity < inventoryLine.quantity) {
+      redirect("/invoices/quick?error=inventory");
+    }
+  }
+
+  const serviceOrderLines = serviceLines.map((line) => {
+    const service = services.find((serviceItem) => serviceItem.id === line.id)!;
+    const unitPrice = Number(
+      service.pricingMethod === "hourly"
+        ? service.hourlyRate?.toString() ?? "0"
+        : service.flatPrice?.toString() ?? "0",
+    );
+
+    return {
+      lineType: "service",
+      serviceItemId: service.id,
+      inventoryItemId: null,
+      description: service.name,
+      quantity: line.quantity,
+      unitPrice,
+      discountPercent: 0,
+      complementary: false,
+      lineTotal: orderLineTotal(line.quantity, unitPrice),
+      notes: service.description,
+      performedByName: null,
+    };
+  });
+
+  const inventoryOrderLines = inventoryLines.map((line) => {
+    const item = inventoryItems.find(
+      (inventoryItem) => inventoryItem.id === line.id,
+    )!;
+    const unitPrice = Number(item.sellPrice.toString());
+
+    return {
+      lineType: "inventory",
+      serviceItemId: null,
+      inventoryItemId: item.id,
+      description: item.name,
+      quantity: line.quantity,
+      unitPrice,
+      discountPercent: 0,
+      complementary: false,
+      lineTotal: orderLineTotal(line.quantity, unitPrice),
+      notes:
+        [item.brand, item.partNumber ? `Part # ${item.partNumber}` : null, item.tireSize]
+          .filter(Boolean)
+          .join(" | ") || null,
+      performedByName: null,
+    };
+  });
+
+  const lineItems = [...serviceOrderLines, ...inventoryOrderLines];
+  const total = lineItems.reduce((sum, lineItem) => sum + lineItem.lineTotal, 0);
+
+  const invoice = await prisma.$transaction(async (tx) => {
+    for (const line of inventoryLines) {
+      await tx.inventoryItem.update({
+        where: {
+          id: line.id,
+        },
+        data: {
+          quantity: {
+            decrement: line.quantity,
+          },
+        },
+      });
+    }
+
+    const customer = await tx.customer.create({
+      data: {
+        firstName: customerNameParts.firstName,
+        lastName: customerNameParts.lastName,
+        phone: "Not provided",
+        notes: "Created from Quick Create Invoice.",
+      },
+    });
+
+    const order = await tx.order.create({
+      data: {
+        orderNumber: createOrderNumber(),
+        status: "completed",
+        customerId: customer.id,
+        createdBy: employee,
+        quotedByEmployeeId,
+        quoteAcceptedAt: new Date(),
+        completedAt: new Date(),
+        notes: "Created from Quick Create Invoice.",
+        lineItems: {
+          create: lineItems.map((lineItem) => ({
+            lineType: lineItem.lineType,
+            serviceItemId: lineItem.serviceItemId,
+            inventoryItemId: lineItem.inventoryItemId,
+            description: lineItem.description,
+            quantity: lineItem.quantity,
+            unitPrice: lineItem.unitPrice,
+            discountPercent: lineItem.discountPercent,
+            complementary: lineItem.complementary,
+            lineTotal: lineItem.lineTotal,
+            notes: lineItem.notes,
+          })),
+        },
+      },
+    });
+
+    return tx.invoice.create({
+      data: {
+        invoiceNumber: createInvoiceNumber(),
+        orderId: order.id,
+        customerId: customer.id,
+        status: "unpaid",
+        subtotal: total,
+        total,
+        lineItems: {
+          create: lineItems.map((lineItem) => ({
+            lineType: lineItem.lineType,
+            description: lineItem.description,
+            quantity: lineItem.quantity,
+            unitPrice: lineItem.unitPrice,
+            discountPercent: lineItem.discountPercent,
+            complementary: lineItem.complementary,
+            lineTotal: lineItem.lineTotal,
+            notes: lineItem.notes,
+            performedByName: lineItem.performedByName,
+          })),
+        },
+      },
+    });
+  });
+
+  redirect(`/invoices/${invoice.id}?created=1`);
+}
+
+export async function markInvoicePaid(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const invoiceId = Number(formData.get("invoiceId"));
+
+  if (!Number.isInteger(invoiceId)) {
+    redirect(`/invoices/${invoiceId || ""}?error=payment`);
+  }
+
+  const invoice = await prisma.invoice.findUnique({
+    where: {
+      id: invoiceId,
+    },
+    select: {
+      id: true,
+      status: true,
+      paidAt: true,
+    },
+  });
+
+  if (!invoice) {
+    redirect(`/invoices/${invoiceId}?error=payment`);
+  }
+
+  if (invoice.status === "paid" && invoice.paidAt) {
+    redirect(`/invoices/${invoice.id}?paid=1`);
+  }
+
+  await prisma.invoice.update({
+    where: {
+      id: invoice.id,
+    },
+    data: {
+      status: "paid",
+      paidAt: new Date(),
+      paidByUsername: employee,
+    },
+  });
+
+  redirect(`/invoices/${invoice.id}?paid=1`);
+}
+
+export async function updateCustomer(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const customerId = Number(formData.get("customerId"));
+  const firstName = String(formData.get("firstName") ?? "").trim();
+  const lastName = String(formData.get("lastName") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
+
+  if (!Number.isInteger(customerId) || !firstName || !lastName || !phone) {
+    redirect(`/customers/${customerId || ""}/edit?error=customer`);
+  }
+
+  await prisma.customer.update({
+    where: {
+      id: customerId,
+    },
+    data: {
+      firstName,
+      lastName,
+      phone,
+      email: nullableValue(formData, "email"),
+      address: nullableValue(formData, "address"),
+      city: nullableValue(formData, "city"),
+      state: nullableValue(formData, "state"),
+      zip: nullableValue(formData, "zip"),
+      preferredContactMethod: nullableValue(formData, "preferredContactMethod"),
+      notes: nullableValue(formData, "customerNotes"),
+    },
+  });
+
+  redirect(`/customers/${customerId}/edit?updated=1`);
+}
+
+export async function addCustomerVehicle(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const customerId = Number(formData.get("customerId"));
+  const year = String(formData.get("year") ?? "").trim();
+  const make = String(formData.get("make") ?? "").trim();
+  const model = String(formData.get("model") ?? "").trim();
+  const mileageValue = String(formData.get("mileage") ?? "").trim();
+  const mileage = mileageValue ? Number(mileageValue) : null;
+
+  if (
+    !Number.isInteger(customerId) ||
+    !year ||
+    !make ||
+    !model ||
+    (mileage !== null && (!Number.isInteger(mileage) || mileage < 0))
+  ) {
+    redirect(`/customers/${customerId || ""}/edit?error=vehicle`);
+  }
+
+  await prisma.vehicle.create({
+    data: {
+      customerId,
+      year,
+      make,
+      model,
+      trim: nullableValue(formData, "trim"),
+      vin: nullableValue(formData, "vin"),
+      licensePlate: nullableValue(formData, "licensePlate"),
+      plateState: nullableValue(formData, "plateState"),
+      color: nullableValue(formData, "color"),
+      mileage,
+      engineSize: nullableValue(formData, "engineSize"),
+      transmissionType: nullableValue(formData, "transmissionType"),
+      transmissionDetails: nullableValue(formData, "transmissionDetails"),
+      fuelType: nullableValue(formData, "fuelType"),
+      driveType: nullableValue(formData, "driveType"),
+      tireSize: nullableValue(formData, "tireSize"),
+      notes: nullableValue(formData, "vehicleNotes"),
+    },
+  });
+
+  redirect(`/customers/${customerId}/edit?vehicleAdded=1`);
+}
