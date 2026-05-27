@@ -547,12 +547,12 @@ async function inventoryPartSalesReport(
       inventoryByName.get(line.description.trim().toLowerCase()) ??
       null;
     const partNumber =
-      item?.partNumber?.trim() || line.inventoryItemId?.toString() || "";
-    const description = line.description || item?.name || "Inventory Item";
+      item?.partNumber?.trim() || item?.id.toString() || line.inventoryItemId?.toString() || "";
+    const description = item?.name || line.description || "Inventory Item";
     const quantity = decimal(line.quantity);
     const historicalCost = decimal(line.costAtSale);
     const cost = historicalCost > 0 ? historicalCost : decimal(item?.cost);
-    const key = `${partNumber}::${description}::${cost.toFixed(2)}`;
+    const key = `${item?.id ?? partNumber}::${description.toLowerCase()}::${cost.toFixed(2)}`;
     const existingRow = rows.get(key);
 
     if (existingRow) {
