@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { addCustomerVehicle, updateCustomer } from "@/app/actions";
+import {
+  addCustomerVehicle,
+  createCustomerAccountEntry,
+  updateCustomer,
+} from "@/app/actions";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSession } from "@/lib/session";
 import { stateOptions } from "@/lib/vehicleOptions";
@@ -14,9 +18,58 @@ type EditCustomerPageProps = {
   searchParams?: Promise<{
     updated?: string;
     vehicleAdded?: string;
+    accountUpdated?: string;
     error?: string;
   }>;
 };
+
+const accountEntryActions = [
+  {
+    type: "payment_on_account",
+    title: "Record Payment On Account",
+    description: "Use when a customer pays toward an open account balance.",
+  },
+  {
+    type: "deposit",
+    title: "Record Deposit",
+    description: "Use when a customer leaves money before final invoice payment.",
+  },
+  {
+    type: "credit",
+    title: "Add Credit",
+    description: "Use for a customer credit that can be applied later.",
+  },
+  {
+    type: "applied_credit",
+    title: "Apply Credit",
+    description: "Use when credit is consumed against customer charges.",
+  },
+  {
+    type: "late_fee",
+    title: "Add Late Fee",
+    description: "Use when an account balance receives a late fee.",
+  },
+];
+
+function money(value: number) {
+  return value.toLocaleString("en-US", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+  });
+}
+
+function accountEntryLabel(entryType: string) {
+  const labels: Record<string, string> = {
+    payment_on_account: "Payment On Account",
+    deposit: "Deposit",
+    credit: "Credit",
+    applied_credit: "Applied Credit",
+    late_fee: "Late Fee",
+    charge: "Charge",
+  };
+
+  return labels[entryType] ?? entryType;
+}
 
 export default async function EditCustomerPage({
   params,
@@ -40,6 +93,12 @@ export default async function EditCustomerPage({
       id: customerId,
     },
     include: {
+      accountEntries: {
+        orderBy: {
+          createdAt: "desc",
+        },
+        take: 25,
+      },
       vehicles: {
         include: {
           _count: {
@@ -60,6 +119,17 @@ export default async function EditCustomerPage({
   }
 
   const query = await searchParams;
+  const accountEntries = customer.accountEntries;
+  const entryTotal = (entryTypes: string[]) =>
+    accountEntries
+      .filter((entry) => entryTypes.includes(entry.entryType))
+      .reduce((sum, entry) => sum + Number(entry.amount), 0);
+  const accountBalance =
+    entryTotal(["charge", "late_fee"]) -
+    entryTotal(["payment_on_account", "applied_credit"]);
+  const availableCredit =
+    entryTotal(["credit", "deposit"]) - entryTotal(["applied_credit"]);
+  const depositTotal = entryTotal(["deposit"]);
 
   return (
     <main className="placeholder-shell">
@@ -88,12 +158,20 @@ export default async function EditCustomerPage({
           <p className="success">Vehicle added.</p>
         ) : null}
 
+        {query?.accountUpdated === "1" ? (
+          <p className="success">Customer account updated.</p>
+        ) : null}
+
         {query?.error === "customer" ? (
           <p className="error">Check the required customer fields.</p>
         ) : null}
 
         {query?.error === "vehicle" ? (
           <p className="error">Check the required vehicle fields.</p>
+        ) : null}
+
+        {query?.error === "account" ? (
+          <p className="error">Check the account entry amount.</p>
         ) : null}
 
         <form className="customer-form" action={updateCustomer}>
@@ -211,6 +289,91 @@ export default async function EditCustomerPage({
             </span>
           </button>
         </form>
+
+        <div className="form-section">
+          <div className="section-heading-row">
+            <div>
+              <h2>Customer Account</h2>
+              <p className="helper">
+                Track account payments, deposits, credits, applied credits, and
+                late fees for accounting reports.
+              </p>
+            </div>
+          </div>
+
+          <div className="account-metric-grid">
+            <div className="account-metric-card">
+              <span>Account Balance</span>
+              <strong>${money(accountBalance)}</strong>
+            </div>
+            <div className="account-metric-card">
+              <span>Available Credit</span>
+              <strong>${money(availableCredit)}</strong>
+            </div>
+            <div className="account-metric-card">
+              <span>Deposits</span>
+              <strong>${money(depositTotal)}</strong>
+            </div>
+          </div>
+
+          <div className="account-action-grid">
+            {accountEntryActions.map((action) => (
+              <form
+                action={createCustomerAccountEntry}
+                className="account-action-card"
+                key={action.type}
+              >
+                <input name="customerId" type="hidden" value={customer.id} />
+                <input name="entryType" type="hidden" value={action.type} />
+                <div>
+                  <h3>{action.title}</h3>
+                  <p>{action.description}</p>
+                </div>
+                <div className="field">
+                  <label htmlFor={`${action.type}-amount`}>Amount</label>
+                  <input
+                    id={`${action.type}-amount`}
+                    min="0.01"
+                    name="amount"
+                    placeholder="0.00"
+                    required
+                    step="0.01"
+                    type="number"
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor={`${action.type}-description`}>Note</label>
+                  <input
+                    id={`${action.type}-description`}
+                    name="description"
+                    placeholder="Optional"
+                  />
+                </div>
+                <button className="secondary-button" type="submit">
+                  Save
+                </button>
+              </form>
+            ))}
+          </div>
+
+          <div className="account-entry-list">
+            <h3>Recent Account Activity</h3>
+            {accountEntries.length > 0 ? (
+              accountEntries.map((entry) => (
+                <div className="account-entry-row" key={entry.id}>
+                  <div>
+                    <strong>{accountEntryLabel(entry.entryType)}</strong>
+                    {entry.description ? <p>{entry.description}</p> : null}
+                  </div>
+                  <span>${money(Number(entry.amount))}</span>
+                  <small>{entry.createdAt.toLocaleDateString("en-US")}</small>
+                </div>
+              ))
+            ) : (
+              <p className="helper">No account activity yet.</p>
+            )}
+          </div>
+        </div>
 
         <div className="form-section">
           <h2>Vehicles</h2>

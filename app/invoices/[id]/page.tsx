@@ -63,12 +63,26 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
       id: invoiceId,
     },
     include: {
-      customer: true,
       vehicle: true,
       order: true,
       lineItems: {
         orderBy: {
           createdAt: "asc",
+        },
+      },
+      payments: {
+        orderBy: {
+          receivedAt: "desc",
+        },
+      },
+      customer: {
+        include: {
+          accountEntries: {
+            orderBy: {
+              entryDate: "desc",
+            },
+            take: 5,
+          },
         },
       },
     },
@@ -143,10 +157,31 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
               <p>
                 Marked paid {formatDateTime(invoice.paidAt)}
                 {invoice.paidByUsername ? ` by ${invoice.paidByUsername}` : ""}
+                {invoice.payments[0] ? ` via ${invoice.payments[0].method}` : ""}
               </p>
             ) : (
               <form action={markInvoicePaid}>
                 <input name="invoiceId" type="hidden" value={invoice.id} />
+                <label className="compact-payment-field">
+                  Payment Method
+                  <select name="paymentMethod" required>
+                    <option value="">Choose method</option>
+                    <option value="cash">Cash</option>
+                    <option value="card">Card</option>
+                    <option value="check">Check</option>
+                    <option value="account">Account</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+                <label className="compact-payment-field">
+                  Payment Purpose
+                  <select name="paymentPurpose" required>
+                    <option value="invoice">Paid on Invoice</option>
+                    <option value="account">Paid on Account</option>
+                    <option value="deposit">Deposit</option>
+                    <option value="applied_credit">Applied Credit</option>
+                  </select>
+                </label>
                 <button className="secondary-button" type="submit">
                   Mark as Paid
                 </button>
@@ -154,6 +189,26 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
             )}
           </article>
         </div>
+
+        {invoice.customer.accountEntries.length > 0 ? (
+          <div className="form-section service-preview">
+            <h2>Recent Account Activity</h2>
+            <div className="compact-result-list">
+              {invoice.customer.accountEntries.map((entry) => (
+                <article className="customer-result-card" key={entry.id}>
+                  <div className="customer-result-header">
+                    <h3>{entry.entryType.replaceAll("_", " ")}</h3>
+                    <strong>${money(entry.amount)}</strong>
+                  </div>
+                  <p>
+                    {formatDateTime(entry.entryDate)}
+                    {entry.description ? ` | ${entry.description}` : ""}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className="form-section service-preview">
           <h2>Invoice Items</h2>
@@ -188,8 +243,11 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
             ))}
 
             <div className="order-total-row">
-              <span>Total</span>
-              <strong>${money(invoice.total)}</strong>
+              <div className="invoice-total-stack">
+                <span>Subtotal: ${money(invoice.subtotal)}</span>
+                <span>Tax: ${money(invoice.taxAmount)}</span>
+                <strong>Total: ${money(invoice.total)}</strong>
+              </div>
             </div>
           </div>
         </div>

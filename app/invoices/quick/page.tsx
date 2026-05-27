@@ -53,6 +53,7 @@ export default async function QuickInvoicePage({
   const serviceOptions = services.map((service) => ({
     id: service.id,
     category: service.category,
+    salesCategory: service.salesCategory,
     name: service.name,
     pricingMethod: service.pricingMethod,
     flatPrice: service.flatPrice?.toString() ?? null,
@@ -63,6 +64,7 @@ export default async function QuickInvoicePage({
   const inventoryOptions = inventoryItems.map((item) => ({
     id: item.id,
     category: item.category,
+    salesCategory: item.salesCategory,
     name: item.name,
     brand: item.brand,
     partNumber: item.partNumber,

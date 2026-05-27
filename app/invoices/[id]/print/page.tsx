@@ -171,6 +171,14 @@ export default async function InvoicePrintPage({ params }: InvoicePrintPageProps
         </table>
 
         <div className="quote-total">
+          <span>Subtotal</span>
+          <strong>${money(invoice.subtotal)}</strong>
+        </div>
+        <div className="quote-total quote-total-secondary">
+          <span>Tax</span>
+          <strong>${money(invoice.taxAmount)}</strong>
+        </div>
+        <div className="quote-total">
           <span>Total Due</span>
           <strong>${money(invoice.total)}</strong>
         </div>

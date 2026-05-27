@@ -12,6 +12,7 @@ type EmployeeOption = {
 type ServiceOption = {
   id: number;
   category: string;
+  salesCategory: string;
   name: string;
   pricingMethod: string;
   flatPrice: string | null;
@@ -22,6 +23,7 @@ type ServiceOption = {
 type InventoryOption = {
   id: number;
   category: string;
+  salesCategory: string;
   name: string;
   brand: string | null;
   partNumber: string | null;

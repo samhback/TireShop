@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServiceItem } from "@/app/actions";
 import { UnsavedHomeLink } from "@/app/UnsavedHomeLink";
+import { salesCategoryOptions } from "@/lib/salesCategories";
 import { serviceCategoryOptions } from "@/lib/serviceOptions";
 import { getEmployeeSession } from "@/lib/session";
 import { PricingFields } from "./PricingFields";
@@ -104,7 +105,23 @@ export default async function AddServicePage({
 
           <div className="form-section">
             <h2>Status</h2>
+            <div className="form-grid">
+              <div className="field">
+                <label htmlFor="salesCategory">Sales Category</label>
+                <select defaultValue="labor" id="salesCategory" name="salesCategory">
+                  {salesCategoryOptions.map((salesCategory) => (
+                    <option key={salesCategory.value} value={salesCategory.value}>
+                      {salesCategory.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
             <div className="option-row">
+              <label>
+                <input defaultChecked name="taxable" type="checkbox" />
+                Taxable
+              </label>
               <label>
                 <input defaultChecked name="active" type="checkbox" />
                 Active

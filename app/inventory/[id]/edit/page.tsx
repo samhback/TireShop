@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { updateInventoryItem } from "@/app/actions";
 import { getInventoryCategory } from "@/lib/inventoryCategories";
 import { prisma } from "@/lib/prisma";
+import { salesCategoryOptions } from "@/lib/salesCategories";
 import { getEmployeeSession } from "@/lib/session";
 
 type EditInventoryPageProps = {
@@ -165,6 +166,36 @@ export default async function EditInventoryPage({
                   type="number"
                 />
               </div>
+            </div>
+          </div>
+
+          <div className="form-section">
+            <h2>Accounting</h2>
+            <div className="form-grid">
+              <div className="field">
+                <label htmlFor="salesCategory">Sales Category</label>
+                <select
+                  defaultValue={item.salesCategory}
+                  id="salesCategory"
+                  name="salesCategory"
+                >
+                  {salesCategoryOptions.map((salesCategory) => (
+                    <option key={salesCategory.value} value={salesCategory.value}>
+                      {salesCategory.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="option-row">
+              <label>
+                <input
+                  defaultChecked={item.taxable}
+                  name="taxable"
+                  type="checkbox"
+                />
+                Taxable
+              </label>
             </div>
           </div>
 

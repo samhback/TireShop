@@ -43,6 +43,8 @@ model InventoryItem {
   quantity          Int
   cost              Decimal         @db.Decimal(10, 2)
   sellPrice         Decimal         @map("sell_price") @db.Decimal(10, 2)
+  taxable           Boolean         @default(true)
+  salesCategory     String          @default("parts") @map("sales_category")
   lowStockThreshold Int             @default(0) @map("low_stock_threshold")
   notes             String?
   tireSize          String?         @map("tire_size")
@@ -84,6 +86,8 @@ model ServiceItem {
   flatPrice      Decimal?        @map("flat_price") @db.Decimal(10, 2)
   hourlyRate     Decimal?        @map("hourly_rate") @db.Decimal(10, 2)
   estimatedHours Decimal?        @map("estimated_hours") @db.Decimal(5, 2)
+  taxable        Boolean         @default(true)
+  salesCategory  String          @default("labor") @map("sales_category")
   active         Boolean         @default(true)
   notes          String?
   orderLineItems OrderLineItem[]
@@ -96,22 +100,24 @@ model ServiceItem {
 }
 
 model Customer {
-  id                     Int       @id @default(autoincrement())
-  firstName              String    @map("first_name")
-  lastName               String    @map("last_name")
+  id                     Int                    @id @default(autoincrement())
+  firstName              String                 @map("first_name")
+  lastName               String                 @map("last_name")
   phone                  String
   email                  String?
   address                String?
   city                   String?
   state                  String?
   zip                    String?
-  preferredContactMethod String?   @map("preferred_contact_method")
+  preferredContactMethod String?                @map("preferred_contact_method")
   notes                  String?
   vehicles               Vehicle[]
   orders                 Order[]
   invoices               Invoice[]
-  createdAt              DateTime  @default(now()) @map("created_at")
-  updatedAt              DateTime  @updatedAt @map("updated_at")
+  accountEntries         CustomerAccountEntry[]
+  createdAt              DateTime               @default(now()) @map("created_at")
+  updatedAt              DateTime               @updatedAt @map("updated_at")
+  payments               Payment[]
 
   @@index([lastName])
   @@index([phone])
@@ -209,22 +215,27 @@ model OrderLineItem {
 }
 
 model Invoice {
-  id             Int               @id @default(autoincrement())
-  invoiceNumber  String            @unique @map("invoice_number")
-  orderId        Int               @unique @map("order_id")
-  order          Order             @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  customerId     Int               @map("customer_id")
-  customer       Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  vehicleId      Int?              @map("vehicle_id")
-  vehicle        Vehicle?          @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-  status         String            @default("unpaid")
-  subtotal       Decimal           @db.Decimal(10, 2)
-  total          Decimal           @db.Decimal(10, 2)
-  paidAt         DateTime?         @map("paid_at")
-  paidByUsername String?           @map("paid_by_username")
-  lineItems      InvoiceLineItem[]
-  createdAt      DateTime          @default(now()) @map("created_at")
-  updatedAt      DateTime          @updatedAt @map("updated_at")
+  id                     Int                    @id @default(autoincrement())
+  invoiceNumber          String                 @unique @map("invoice_number")
+  orderId                Int                    @unique @map("order_id")
+  order                  Order                  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  customerId             Int                    @map("customer_id")
+  customer               Customer               @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  vehicleId              Int?                   @map("vehicle_id")
+  vehicle                Vehicle?               @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  status                 String                 @default("unpaid")
+  subtotal               Decimal                @db.Decimal(10, 2)
+  taxableSubtotal        Decimal                @default(0) @map("taxable_subtotal") @db.Decimal(10, 2)
+  taxRate                Decimal                @default(0) @map("tax_rate") @db.Decimal(7, 5)
+  taxAmount              Decimal                @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  total                  Decimal                @db.Decimal(10, 2)
+  paidAt                 DateTime?              @map("paid_at")
+  paidByUsername         String?                @map("paid_by_username")
+  lineItems              InvoiceLineItem[]
+  payments               Payment[]
+  createdAt              DateTime               @default(now()) @map("created_at")
+  updatedAt              DateTime               @updatedAt @map("updated_at")
+  customerAccountEntries CustomerAccountEntry[]
 
   @@index([invoiceNumber])
   @@index([customerId])
@@ -239,11 +250,18 @@ model InvoiceLineItem {
   invoiceId       Int      @map("invoice_id")
   invoice         Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   lineType        String   @map("line_type")
+  serviceItemId   Int?     @map("service_item_id")
+  inventoryItemId Int?     @map("inventory_item_id")
+  category        String?
+  salesCategory   String   @default("parts") @map("sales_category")
   description     String
   quantity        Decimal  @db.Decimal(10, 2)
   unitPrice       Decimal  @map("unit_price") @db.Decimal(10, 2)
+  costAtSale      Decimal? @map("cost_at_sale") @db.Decimal(10, 2)
   discountPercent Decimal  @default(0) @map("discount_percent") @db.Decimal(5, 2)
   complementary   Boolean  @default(false)
+  taxable         Boolean  @default(true)
+  taxAmount       Decimal  @default(0) @map("tax_amount") @db.Decimal(10, 2)
   lineTotal       Decimal  @map("line_total") @db.Decimal(10, 2)
   notes           String?
   performedByName String?  @map("performed_by_name")
@@ -252,5 +270,55 @@ model InvoiceLineItem {
 
   @@index([invoiceId])
   @@index([lineType])
+  @@index([serviceItemId])
+  @@index([inventoryItemId])
   @@map("invoice-line-items")
+}
+
+model Payment {
+  id                     Int                    @id @default(autoincrement())
+  invoiceId              Int                    @map("invoice_id")
+  invoice                Invoice                @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  customerId             Int                    @map("customer_id")
+  customer               Customer               @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  amount                 Decimal                @db.Decimal(10, 2)
+  method                 String
+  purpose                String                 @default("invoice") // invoice, account, deposit, applied_credit
+  receivedAt             DateTime               @default(now()) @map("received_at")
+  receivedByUsername     String?                @map("received_by_username")
+  notes                  String?
+  createdAt              DateTime               @default(now()) @map("created_at")
+  updatedAt              DateTime               @updatedAt @map("updated_at")
+  customerAccountEntries CustomerAccountEntry[]
+
+  @@index([invoiceId])
+  @@index([customerId])
+  @@index([method])
+  @@index([purpose])
+  @@index([receivedAt])
+  @@map("payments")
+}
+
+model CustomerAccountEntry {
+  id          Int      @id @default(autoincrement())
+  customerId  Int      @map("customer_id")
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  invoiceId   Int?     @map("invoice_id")
+  invoice     Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  paymentId   Int?     @map("payment_id")
+  payment     Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  entryType   String   @map("entry_type") // charge, payment_on_account, deposit, credit, applied_credit, late_fee
+  amount      Decimal  @db.Decimal(10, 2)
+  description String?
+  entryDate   DateTime @default(now()) @map("entry_date")
+  createdBy   String?  @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([customerId])
+  @@index([invoiceId])
+  @@index([paymentId])
+  @@index([entryType])
+  @@index([entryDate])
+  @@map("customer-account-entries")
 }

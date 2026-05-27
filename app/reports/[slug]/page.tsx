@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { salesCategoryLabel } from "@/lib/salesCategories";
 import { getEmployeeSession } from "@/lib/session";
 import { PrintButton } from "../PrintButton";
 
@@ -32,10 +33,13 @@ type InvoiceWithDetails = Prisma.InvoiceGetPayload<{
       };
     };
     lineItems: true;
+    payments: true;
   };
 }>;
 
 const reportTitles: Record<string, string> = {
+  "sales-receipts-summary": "Sales Receipts Summary",
+  "inventory-part-sales": "Inventory Part Sales",
   "revenue": "Revenue Report",
   "profit": "Profit Report",
   "inventory-used": "Inventory Used Report",
@@ -83,6 +87,23 @@ function formatDate(value: Date | string | null) {
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
   }).format(new Date(value));
+}
+
+function formatNumericDate(value: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+  }).format(value);
+}
+
+function accountingAmount(value: number, includeDollar = false) {
+  const formatted = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Math.abs(value));
+
+  return `${value < 0 ? "-" : ""}${includeDollar ? "$" : ""}${formatted}`;
 }
 
 function customerName(invoice: Pick<InvoiceWithDetails, "customer">) {
@@ -133,9 +154,24 @@ async function getInvoices(start: Date, end: Date) {
         },
       },
       lineItems: true,
+      payments: true,
     },
     orderBy: {
       createdAt: "desc",
+    },
+  });
+}
+
+async function getAccountEntries(start: Date, end: Date) {
+  return prisma.customerAccountEntry.findMany({
+    where: {
+      entryDate: {
+        gte: start,
+        lte: end,
+      },
+    },
+    orderBy: {
+      entryDate: "desc",
     },
   });
 }
@@ -275,8 +311,333 @@ function revenueReport(invoices: InvoiceWithDetails[]) {
   );
 }
 
+function salesCategory(line: InvoiceWithDetails["lineItems"][number]) {
+  return salesCategoryLabel(line.salesCategory);
+}
+
+function salesReceiptsSummaryReport(
+  invoices: InvoiceWithDetails[],
+  accountEntries: Awaited<ReturnType<typeof getAccountEntries>>,
+  start: Date,
+  end: Date,
+) {
+  const paidInvoices = invoices.filter((invoice) => invoice.status === "paid");
+  const payments = paidInvoices.flatMap((invoice) => invoice.payments);
+  const ledgerOnlyTotal = (entryType: string) =>
+    accountEntries
+      .filter((entry) => entry.entryType === entryType && !entry.paymentId)
+      .reduce((sum, entry) => sum + decimal(entry.amount), 0);
+  const receiptsPaidOnAccount = payments
+    .filter((payment) => payment.purpose === "account")
+    .reduce((sum, payment) => sum + decimal(payment.amount), 0) +
+    ledgerOnlyTotal("payment_on_account");
+  const receiptsOnDeposit = payments
+    .filter((payment) => payment.purpose === "deposit")
+    .reduce((sum, payment) => sum + decimal(payment.amount), 0) +
+    ledgerOnlyTotal("deposit");
+  const receiptsPaidOnInvoices = payments
+    .filter((payment) => payment.purpose === "invoice")
+    .reduce((sum, payment) => sum + decimal(payment.amount), 0);
+  const totalReceipts =
+    receiptsPaidOnInvoices + receiptsPaidOnAccount + receiptsOnDeposit;
+  const postedRows = [
+    "Parts",
+    "Parts Discount",
+    "Cores",
+    "Labor",
+    "Labor Discount",
+    "Tires",
+    "Sublet",
+    "Shop Supplies",
+    "Hazardous Materials",
+    "Tire Disposal",
+  ].map((label) => ({ label, taxable: 0, nonTaxable: 0, isDiscount: label.includes("Discount") }));
+
+  invoices.flatMap((invoice) => invoice.lineItems).forEach((line) => {
+    const category = salesCategory(line);
+    const quantity = decimal(line.quantity);
+    const gross = quantity * decimal(line.unitPrice);
+    const net = decimal(line.lineTotal);
+    const discount = Math.max(gross - net, 0);
+    const salesRow = postedRows.find((row) => row.label === category);
+    const discountRow = postedRows.find((row) =>
+      category === "Labor" ? row.label === "Labor Discount" : row.label === "Parts Discount",
+    );
+    const column = line.taxable ? "taxable" : "nonTaxable";
+
+    if (salesRow) {
+      salesRow[column] += gross;
+    }
+
+    if (discount > 0 && discountRow) {
+      discountRow[column] -= discount;
+    }
+  });
+
+  const taxableSubtotal = postedRows.reduce((sum, row) => sum + row.taxable, 0);
+  const nonTaxableSubtotal = postedRows.reduce(
+    (sum, row) => sum + row.nonTaxable,
+    0,
+  );
+  const postedSubtotal = taxableSubtotal + nonTaxableSubtotal;
+  const taxCollected = invoices.reduce(
+    (sum, invoice) => sum + decimal(invoice.taxAmount),
+    0,
+  );
+  const totalSalesWithTax = postedSubtotal + taxCollected;
+  const balanceDueCharges = invoices
+    .filter((invoice) => invoice.status !== "paid")
+    .reduce((sum, invoice) => sum + decimal(invoice.total), 0);
+  const lateFeesAssessed = accountEntries
+    .filter((entry) => entry.entryType === "late_fee")
+    .reduce((sum, entry) => sum + decimal(entry.amount), 0);
+  const appliedCredits = accountEntries
+    .filter((entry) => entry.entryType === "applied_credit")
+    .reduce((sum, entry) => sum + decimal(entry.amount), 0);
+
+  return (
+    <div className="sales-receipts-report">
+      <header className="sales-receipts-header">
+        <div>
+          <h1>Sales / Receipts Summary for Healdton Service Center</h1>
+          <p>
+            <strong>From:</strong> {formatNumericDate(start)}{" "}
+            <strong>To:</strong> {formatNumericDate(end)}
+          </p>
+        </div>
+        <p>
+          <strong>Printed:</strong> {formatNumericDate(new Date())}
+        </p>
+      </header>
+
+      <section className="accounting-section receipts-summary-block">
+        <h2>Receipts Summary</h2>
+        <div className="receipt-lines">
+          <div>
+            <span>Total Receipts Paid On Invoices :</span>
+            <strong>{accountingAmount(receiptsPaidOnInvoices)}</strong>
+          </div>
+          <div>
+            <span>Total Receipts Paid On Account :</span>
+            <strong>{accountingAmount(receiptsPaidOnAccount)}</strong>
+          </div>
+          <div>
+            <span>Total Receipts On Deposit :</span>
+            <strong>{accountingAmount(receiptsOnDeposit)}</strong>
+          </div>
+          <div className="receipt-total">
+            <span />
+            <strong>{accountingAmount(totalReceipts, true)}</strong>
+          </div>
+        </div>
+      </section>
+
+      <section className="accounting-section posted-order-sales">
+        <div className="posted-sales-header">
+          <strong>Posted Order Sales</strong>
+          <strong>Taxable</strong>
+          <strong>Non-taxable</strong>
+          <strong>Total</strong>
+        </div>
+
+        <div className="posted-sales-body">
+          {postedRows.map((row) => (
+            <div className="posted-sales-row" key={row.label}>
+              <span>{row.label} :</span>
+              <span className={row.isDiscount ? "discount-value" : ""}>
+                {accountingAmount(row.taxable)}
+              </span>
+              <span className={row.isDiscount ? "discount-value" : ""}>
+                {accountingAmount(row.nonTaxable)}
+              </span>
+              <span className={row.isDiscount ? "discount-value" : ""}>
+                {accountingAmount(row.taxable + row.nonTaxable)}
+              </span>
+            </div>
+          ))}
+
+          <div className="posted-sales-row posted-subtotal">
+            <span>Subtotal:</span>
+            <strong>{accountingAmount(taxableSubtotal, true)}</strong>
+            <strong>{accountingAmount(nonTaxableSubtotal, true)}</strong>
+            <strong>{accountingAmount(postedSubtotal)}</strong>
+          </div>
+
+          <div className="posted-sales-row tax-line">
+            <span />
+            <span />
+            <span>+ Tax :</span>
+            <strong>{accountingAmount(taxCollected)}</strong>
+          </div>
+
+          <div className="posted-sales-row total-sales-tax">
+            <span />
+            <span />
+            <span>Total Sales with Tax:</span>
+            <strong>{accountingAmount(totalSalesWithTax, true)}</strong>
+          </div>
+
+          <div className="posted-sales-row balance-summary">
+            <span />
+            <span />
+            <span>*Balance Due Charges Summary:</span>
+            <strong>{accountingAmount(balanceDueCharges, true)}</strong>
+          </div>
+
+          <div className="posted-sales-row balance-detail">
+            <span />
+            <span />
+            <span>Late Fees Assessed:</span>
+            <strong>{accountingAmount(lateFeesAssessed)}</strong>
+          </div>
+
+          <div className="posted-sales-row balance-detail">
+            <span />
+            <span />
+            <span>From Applied Credits:</span>
+            <strong>{accountingAmount(appliedCredits, true)}</strong>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+async function inventoryPartSalesReport(
+  invoices: InvoiceWithDetails[],
+  start: Date,
+  end: Date,
+) {
+  const inventoryLines = invoices
+    .flatMap((invoice) => invoice.lineItems)
+    .filter((line) => line.lineType === "inventory");
+  const inventoryIds = [
+    ...new Set(
+      inventoryLines
+        .map((line) => line.inventoryItemId)
+        .filter((id): id is number => typeof id === "number"),
+    ),
+  ];
+  const inventoryItems = await prisma.inventoryItem.findMany({
+    select: {
+      id: true,
+      name: true,
+      partNumber: true,
+      cost: true,
+    },
+  });
+  const inventoryById = new Map(inventoryItems.map((item) => [item.id, item]));
+  const inventoryByName = new Map(
+    inventoryItems.map((item) => [item.name.trim().toLowerCase(), item]),
+  );
+  const rows = new Map<
+    string,
+    {
+      partNumber: string;
+      description: string;
+      quantity: number;
+      cost: number;
+      extendedCost: number;
+    }
+  >();
+
+  inventoryLines.forEach((line) => {
+    const item =
+      (line.inventoryItemId ? inventoryById.get(line.inventoryItemId) : null) ??
+      inventoryByName.get(line.description.trim().toLowerCase()) ??
+      null;
+    const partNumber =
+      item?.partNumber?.trim() || line.inventoryItemId?.toString() || "";
+    const description = line.description || item?.name || "Inventory Item";
+    const quantity = decimal(line.quantity);
+    const historicalCost = decimal(line.costAtSale);
+    const cost = historicalCost > 0 ? historicalCost : decimal(item?.cost);
+    const key = `${partNumber}::${description}::${cost.toFixed(2)}`;
+    const existingRow = rows.get(key);
+
+    if (existingRow) {
+      existingRow.quantity += quantity;
+      existingRow.extendedCost += quantity * cost;
+    } else {
+      rows.set(key, {
+        partNumber,
+        description,
+        quantity,
+        cost,
+        extendedCost: quantity * cost,
+      });
+    }
+  });
+
+  const sortedRows = [...rows.values()].sort((first, second) =>
+    first.partNumber.localeCompare(second.partNumber, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    }),
+  );
+  const grandTotal = sortedRows.reduce(
+    (sum, row) => sum + row.extendedCost,
+    0,
+  );
+
+  return (
+    <div className="inventory-part-sales-report">
+      <header className="inventory-part-sales-header">
+        <h1>Inventory Part Sales</h1>
+        <div className="inventory-part-sales-dates">
+          <span>
+            Print Date : <strong>{formatNumericDate(new Date())}</strong>
+          </span>
+          <span>
+            Period From : <strong>{formatNumericDate(start)}</strong>
+          </span>
+          <span>
+            To : <strong>{formatNumericDate(end)}</strong>
+          </span>
+        </div>
+      </header>
+
+      <table className="inventory-part-sales-table">
+        <thead>
+          <tr>
+            <th>Part Number</th>
+            <th>Description</th>
+            <th>Quantity</th>
+            <th>Cost</th>
+            <th>Extended Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sortedRows.length > 0 ? (
+            sortedRows.map((row) => (
+              <tr key={`${row.partNumber}-${row.description}-${row.cost}`}>
+                <td>{row.partNumber}</td>
+                <td>{row.description}</td>
+                <td>{accountingAmount(row.quantity)}</td>
+                <td>{accountingAmount(row.cost)}</td>
+                <td>{accountingAmount(row.extendedCost)}</td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan={5}>No inventory part sales for this period.</td>
+            </tr>
+          )}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colSpan={3} />
+            <td>Grand Total:</td>
+            <td>{accountingAmount(grandTotal)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
 function profitReport(invoices: InvoiceWithDetails[]) {
-  const inventoryLines = invoices.flatMap((invoice) => invoice.order.lineItems).filter(
+  const inventoryLines = invoices.flatMap((invoice) => invoice.lineItems).filter(
     (line) => line.lineType === "inventory",
   );
   const serviceRevenue = invoices
@@ -288,7 +649,7 @@ function profitReport(invoices: InvoiceWithDetails[]) {
     0,
   );
   const inventoryCost = inventoryLines.reduce(
-    (sum, line) => sum + decimal(line.quantity) * decimal(line.inventoryItem?.cost),
+    (sum, line) => sum + decimal(line.quantity) * decimal(line.costAtSale),
     0,
   );
   const grossProfit = serviceRevenue + inventoryRevenue - inventoryCost;
@@ -300,7 +661,7 @@ function profitReport(invoices: InvoiceWithDetails[]) {
   return (
     <>
       <p className="report-note">
-        Inventory profit uses the current stored inventory cost. Historical cost tracking can be added later.
+        Inventory profit uses the cost stored on each invoice line at the time the invoice was created.
       </p>
       <MetricGrid
         metrics={[
@@ -315,7 +676,7 @@ function profitReport(invoices: InvoiceWithDetails[]) {
         columns={["Item", "Qty", "Revenue", "Est. Cost", "Est. Profit"]}
         rows={inventoryLines.map((line) => {
           const revenue = decimal(line.lineTotal);
-          const cost = decimal(line.quantity) * decimal(line.inventoryItem?.cost);
+          const cost = decimal(line.quantity) * decimal(line.costAtSale);
 
           return [
             line.description,
@@ -336,14 +697,14 @@ function inventoryUsedReport(invoices: InvoiceWithDetails[]) {
     { category: string; name: string; quantity: number; revenue: number; cost: number }
   >();
 
-  invoices.flatMap((invoice) => invoice.order.lineItems).forEach((line) => {
+  invoices.flatMap((invoice) => invoice.lineItems).forEach((line) => {
     if (line.lineType !== "inventory") {
       return;
     }
 
     const key = `${line.inventoryItemId ?? line.description}`;
     const existing = rows.get(key) ?? {
-      category: line.inventoryItem?.category ?? "Unknown",
+      category: line.category ?? "Unknown",
       name: line.description,
       quantity: 0,
       revenue: 0,
@@ -353,7 +714,7 @@ function inventoryUsedReport(invoices: InvoiceWithDetails[]) {
 
     existing.quantity += quantity;
     existing.revenue += decimal(line.lineTotal);
-    existing.cost += quantity * decimal(line.inventoryItem?.cost);
+    existing.cost += quantity * decimal(line.costAtSale);
     rows.set(key, existing);
   });
 
@@ -641,10 +1002,18 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
   const { start, end } = reportRange(search);
   const usesDateRange = !["low-stock", "vehicle-history"].includes(slug);
   const invoices = usesDateRange ? await getInvoices(start, end) : [];
+  const accountEntries =
+    slug === "sales-receipts-summary" ? await getAccountEntries(start, end) : [];
 
   let content;
 
   if (slug === "revenue") content = revenueReport(invoices);
+  if (slug === "sales-receipts-summary") {
+    content = salesReceiptsSummaryReport(invoices, accountEntries, start, end);
+  }
+  if (slug === "inventory-part-sales") {
+    content = await inventoryPartSalesReport(invoices, start, end);
+  }
   if (slug === "profit") content = profitReport(invoices);
   if (slug === "inventory-used") content = inventoryUsedReport(invoices);
   if (slug === "low-stock") content = await lowStockReport();
@@ -669,17 +1038,19 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
           <PrintButton />
         </div>
 
-        <header className="report-header">
-          <div>
-            <p className="eyebrow">Healdton Service Center</p>
-            <h1>{title}</h1>
-            <p className="helper">
-              {usesDateRange
-                ? `${formatDate(start)} through ${formatDate(end)}`
-                : "Current report"}
-            </p>
-          </div>
-        </header>
+        {!["sales-receipts-summary", "inventory-part-sales"].includes(slug) ? (
+          <header className="report-header">
+            <div>
+              <p className="eyebrow">Healdton Service Center</p>
+              <h1>{title}</h1>
+              <p className="helper">
+                {usesDateRange
+                  ? `${formatDate(start)} through ${formatDate(end)}`
+                  : "Current report"}
+              </p>
+            </div>
+          </header>
+        ) : null}
 
         {usesDateRange ? (
           <DateFilter end={end} start={start} />

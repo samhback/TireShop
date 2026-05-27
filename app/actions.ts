@@ -9,6 +9,7 @@ import {
   setEmployeeSession,
 } from "@/lib/session";
 import { getInventoryCategory } from "@/lib/inventoryCategories";
+import { defaultInventorySalesCategory, salesCategoryOptions } from "@/lib/salesCategories";
 import { normalizeUsername } from "@/lib/usernames";
 
 async function currentEmployeeIsAdmin() {
@@ -252,6 +253,38 @@ function orderLineTotal(
   return Number((subtotal * discountMultiplier).toFixed(2));
 }
 
+function currentTaxRate() {
+  const configuredRate = Number(process.env.SALES_TAX_RATE ?? "0");
+  return Number.isNaN(configuredRate) || configuredRate < 0 ? 0 : configuredRate;
+}
+
+function calculateInvoiceTotals(
+  lineItems: {
+    lineTotal: number | { toString(): string };
+    taxable: boolean;
+  }[],
+) {
+  const subtotal = lineItems.reduce(
+    (total, lineItem) => total + Number(lineItem.lineTotal.toString()),
+    0,
+  );
+  const taxableSubtotal = lineItems.reduce(
+    (total, lineItem) =>
+      total + (lineItem.taxable ? Number(lineItem.lineTotal.toString()) : 0),
+    0,
+  );
+  const taxRate = currentTaxRate();
+  const taxAmount = Number((taxableSubtotal * taxRate).toFixed(2));
+
+  return {
+    subtotal,
+    taxableSubtotal,
+    taxRate,
+    taxAmount,
+    total: Number((subtotal + taxAmount).toFixed(2)),
+  };
+}
+
 type QuickInvoiceLineInput = {
   id?: unknown;
   quantity?: unknown;
@@ -318,6 +351,28 @@ function splitCustomerName(customerName: string) {
   };
 }
 
+function validSalesCategory(value: string, fallback: string) {
+  return salesCategoryOptions.some((category) => category.value === value)
+    ? value
+    : fallback;
+}
+
+function validPaymentPurpose(value: string) {
+  return ["invoice", "account", "deposit", "applied_credit"].includes(value)
+    ? value
+    : "invoice";
+}
+
+function validCustomerAccountEntryType(value: string) {
+  return [
+    "payment_on_account",
+    "deposit",
+    "credit",
+    "applied_credit",
+    "late_fee",
+  ].includes(value);
+}
+
 async function orderHasVehicle(orderId: number) {
   const order = await prisma.order.findUnique({
     where: {
@@ -345,6 +400,10 @@ export async function createInventoryItem(formData: FormData) {
   const cost = Number(formData.get("cost"));
   const sellPrice = Number(formData.get("sellPrice"));
   const lowStockThreshold = Number(formData.get("lowStockThreshold") || 0);
+  const salesCategory = validSalesCategory(
+    String(formData.get("salesCategory") ?? ""),
+    defaultInventorySalesCategory(category),
+  );
 
   if (
     !categoryConfig ||
@@ -370,6 +429,8 @@ export async function createInventoryItem(formData: FormData) {
       quantity,
       cost,
       sellPrice,
+      taxable: formData.get("taxable") === "on",
+      salesCategory,
       lowStockThreshold,
       notes: nullableValue(formData, "notes"),
       tireSize: nullableValue(formData, "tireSize"),
@@ -414,6 +475,10 @@ export async function updateInventoryItem(formData: FormData) {
   const cost = Number(formData.get("cost"));
   const sellPrice = Number(formData.get("sellPrice"));
   const lowStockThreshold = Number(formData.get("lowStockThreshold") || 0);
+  const salesCategory = validSalesCategory(
+    String(formData.get("salesCategory") ?? ""),
+    defaultInventorySalesCategory(category),
+  );
 
   if (
     !Number.isInteger(itemId) ||
@@ -443,6 +508,8 @@ export async function updateInventoryItem(formData: FormData) {
       quantity,
       cost,
       sellPrice,
+      taxable: formData.get("taxable") === "on",
+      salesCategory,
       lowStockThreshold,
       notes: nullableValue(formData, "notes"),
       tireSize: nullableValue(formData, "tireSize"),
@@ -486,6 +553,10 @@ export async function createServiceItem(formData: FormData) {
   const hourlyRate = Number(formData.get("hourlyRate"));
   const estimatedHoursValue = String(formData.get("estimatedHours") ?? "").trim();
   const estimatedHours = estimatedHoursValue ? Number(estimatedHoursValue) : null;
+  const salesCategory = validSalesCategory(
+    String(formData.get("salesCategory") ?? ""),
+    "labor",
+  );
 
   const flatPriceInvalid =
     pricingMethod === "flat" && (Number.isNaN(flatPrice) || flatPrice < 0);
@@ -515,6 +586,8 @@ export async function createServiceItem(formData: FormData) {
       flatPrice: pricingMethod === "flat" ? flatPrice : null,
       hourlyRate: pricingMethod === "hourly" ? hourlyRate : null,
       estimatedHours,
+      taxable: formData.get("taxable") === "on",
+      salesCategory,
       active: formData.get("active") === "on",
       notes: nullableValue(formData, "notes"),
     },
@@ -538,6 +611,10 @@ export async function updateServiceItem(formData: FormData) {
   const hourlyRate = Number(formData.get("hourlyRate"));
   const estimatedHoursValue = String(formData.get("estimatedHours") ?? "").trim();
   const estimatedHours = estimatedHoursValue ? Number(estimatedHoursValue) : null;
+  const salesCategory = validSalesCategory(
+    String(formData.get("salesCategory") ?? ""),
+    "labor",
+  );
 
   const flatPriceInvalid =
     pricingMethod === "flat" && (Number.isNaN(flatPrice) || flatPrice < 0);
@@ -571,6 +648,8 @@ export async function updateServiceItem(formData: FormData) {
       flatPrice: pricingMethod === "flat" ? flatPrice : null,
       hourlyRate: pricingMethod === "hourly" ? hourlyRate : null,
       estimatedHours,
+      taxable: formData.get("taxable") === "on",
+      salesCategory,
       active: formData.get("active") === "on",
       notes: nullableValue(formData, "notes"),
     },
@@ -1672,6 +1751,8 @@ export async function completeOrder(formData: FormData) {
       lineItems: {
         include: {
           performedByEmployee: true,
+          inventoryItem: true,
+          serviceItem: true,
         },
       },
     },
@@ -1723,10 +1804,47 @@ export async function completeOrder(formData: FormData) {
     }
   }
 
-  const subtotal = order.lineItems.reduce(
-    (total, lineItem) => total + Number(lineItem.lineTotal.toString()),
-    0,
-  );
+  const invoiceLineItems = order.lineItems.map((lineItem) => {
+    const taxable =
+      lineItem.lineType === "inventory"
+        ? lineItem.inventoryItem?.taxable ?? true
+        : lineItem.lineType === "service"
+          ? lineItem.serviceItem?.taxable ?? true
+          : true;
+
+    return {
+      lineType: lineItem.lineType,
+      serviceItemId: lineItem.serviceItemId,
+      inventoryItemId: lineItem.inventoryItemId,
+      category:
+        lineItem.lineType === "inventory"
+          ? lineItem.inventoryItem?.category ?? null
+          : lineItem.lineType === "service"
+            ? lineItem.serviceItem?.category ?? null
+            : null,
+      salesCategory:
+        lineItem.lineType === "inventory"
+          ? lineItem.inventoryItem?.salesCategory ?? "parts"
+          : lineItem.lineType === "service"
+            ? lineItem.serviceItem?.salesCategory ?? "labor"
+            : "parts",
+      description: lineItem.description,
+      quantity: lineItem.quantity,
+      unitPrice: lineItem.unitPrice,
+      costAtSale:
+        lineItem.lineType === "inventory"
+          ? lineItem.inventoryItem?.cost ?? null
+          : null,
+      discountPercent: lineItem.discountPercent,
+      complementary: lineItem.complementary,
+      taxable,
+      taxAmount: 0,
+      lineTotal: lineItem.lineTotal,
+      notes: lineItem.notes,
+      performedByName: lineItem.performedByEmployee?.name ?? null,
+    };
+  });
+  const invoiceTotals = calculateInvoiceTotals(invoiceLineItems);
 
   const invoice = await prisma.$transaction(async (tx) => {
     for (const lineItem of inventoryLines) {
@@ -1749,20 +1867,13 @@ export async function completeOrder(formData: FormData) {
         customerId: order.customerId,
         vehicleId: order.vehicleId,
         status: "unpaid",
-        subtotal,
-        total: subtotal,
+        subtotal: invoiceTotals.subtotal,
+        taxableSubtotal: invoiceTotals.taxableSubtotal,
+        taxRate: invoiceTotals.taxRate,
+        taxAmount: invoiceTotals.taxAmount,
+        total: invoiceTotals.total,
         lineItems: {
-          create: order.lineItems.map((lineItem) => ({
-            lineType: lineItem.lineType,
-            description: lineItem.description,
-            quantity: lineItem.quantity,
-            unitPrice: lineItem.unitPrice,
-            discountPercent: lineItem.discountPercent,
-            complementary: lineItem.complementary,
-            lineTotal: lineItem.lineTotal,
-            notes: lineItem.notes,
-            performedByName: lineItem.performedByEmployee?.name ?? null,
-          })),
+          create: invoiceLineItems,
         },
       },
     });
@@ -1873,6 +1984,11 @@ export async function createQuickInvoice(formData: FormData) {
       discountPercent: 0,
       complementary: false,
       lineTotal: orderLineTotal(line.quantity, unitPrice),
+      category: service.category,
+      salesCategory: service.salesCategory,
+      costAtSale: null,
+      taxable: service.taxable,
+      taxAmount: 0,
       notes: service.description,
       performedByName: null,
     };
@@ -1894,6 +2010,11 @@ export async function createQuickInvoice(formData: FormData) {
       discountPercent: 0,
       complementary: false,
       lineTotal: orderLineTotal(line.quantity, unitPrice),
+      category: item.category,
+      salesCategory: item.salesCategory,
+      costAtSale: item.cost,
+      taxable: item.taxable,
+      taxAmount: 0,
       notes:
         [item.brand, item.partNumber ? `Part # ${item.partNumber}` : null, item.tireSize]
           .filter(Boolean)
@@ -1903,7 +2024,7 @@ export async function createQuickInvoice(formData: FormData) {
   });
 
   const lineItems = [...serviceOrderLines, ...inventoryOrderLines];
-  const total = lineItems.reduce((sum, lineItem) => sum + lineItem.lineTotal, 0);
+  const invoiceTotals = calculateInvoiceTotals(lineItems);
 
   const invoice = await prisma.$transaction(async (tx) => {
     for (const line of inventoryLines) {
@@ -1961,16 +2082,26 @@ export async function createQuickInvoice(formData: FormData) {
         orderId: order.id,
         customerId: customer.id,
         status: "unpaid",
-        subtotal: total,
-        total,
+        subtotal: invoiceTotals.subtotal,
+        taxableSubtotal: invoiceTotals.taxableSubtotal,
+        taxRate: invoiceTotals.taxRate,
+        taxAmount: invoiceTotals.taxAmount,
+        total: invoiceTotals.total,
         lineItems: {
           create: lineItems.map((lineItem) => ({
             lineType: lineItem.lineType,
+            serviceItemId: lineItem.serviceItemId,
+            inventoryItemId: lineItem.inventoryItemId,
+            category: lineItem.category,
+            salesCategory: lineItem.salesCategory,
             description: lineItem.description,
             quantity: lineItem.quantity,
             unitPrice: lineItem.unitPrice,
+            costAtSale: lineItem.costAtSale,
             discountPercent: lineItem.discountPercent,
             complementary: lineItem.complementary,
+            taxable: lineItem.taxable,
+            taxAmount: lineItem.taxAmount,
             lineTotal: lineItem.lineTotal,
             notes: lineItem.notes,
             performedByName: lineItem.performedByName,
@@ -1991,8 +2122,12 @@ export async function markInvoicePaid(formData: FormData) {
   }
 
   const invoiceId = Number(formData.get("invoiceId"));
+  const paymentMethod = String(formData.get("paymentMethod") ?? "").trim();
+  const paymentPurpose = validPaymentPurpose(
+    String(formData.get("paymentPurpose") ?? ""),
+  );
 
-  if (!Number.isInteger(invoiceId)) {
+  if (!Number.isInteger(invoiceId) || !paymentMethod) {
     redirect(`/invoices/${invoiceId || ""}?error=payment`);
   }
 
@@ -2004,6 +2139,8 @@ export async function markInvoicePaid(formData: FormData) {
       id: true,
       status: true,
       paidAt: true,
+      total: true,
+      customerId: true,
     },
   });
 
@@ -2015,15 +2152,45 @@ export async function markInvoicePaid(formData: FormData) {
     redirect(`/invoices/${invoice.id}?paid=1`);
   }
 
-  await prisma.invoice.update({
-    where: {
-      id: invoice.id,
-    },
-    data: {
-      status: "paid",
-      paidAt: new Date(),
-      paidByUsername: employee,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.invoice.update({
+      where: {
+        id: invoice.id,
+      },
+      data: {
+        status: "paid",
+        paidAt: new Date(),
+        paidByUsername: employee,
+      },
+    });
+
+    const payment = await tx.payment.create({
+      data: {
+        invoiceId: invoice.id,
+        customerId: invoice.customerId,
+        amount: invoice.total,
+        method: paymentMethod,
+        purpose: paymentPurpose,
+        receivedByUsername: employee,
+      },
+    });
+
+    if (paymentPurpose !== "invoice") {
+      await tx.customerAccountEntry.create({
+        data: {
+          customerId: invoice.customerId,
+          invoiceId: invoice.id,
+          paymentId: payment.id,
+          entryType:
+            paymentPurpose === "account"
+              ? "payment_on_account"
+              : paymentPurpose,
+          amount: invoice.total,
+          description: `Payment recorded as ${paymentPurpose.replace("_", " ")}.`,
+          createdBy: employee,
+        },
+      });
+    }
   });
 
   redirect(`/invoices/${invoice.id}?paid=1`);
@@ -2064,6 +2231,52 @@ export async function updateCustomer(formData: FormData) {
   });
 
   redirect(`/customers/${customerId}/edit?updated=1`);
+}
+
+export async function createCustomerAccountEntry(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const customerId = Number(formData.get("customerId"));
+  const entryType = String(formData.get("entryType") ?? "").trim();
+  const amount = Number(formData.get("amount"));
+
+  if (
+    !Number.isInteger(customerId) ||
+    !validCustomerAccountEntryType(entryType) ||
+    Number.isNaN(amount) ||
+    amount <= 0
+  ) {
+    redirect(`/customers/${customerId || ""}/edit?error=account`);
+  }
+
+  const customer = await prisma.customer.findUnique({
+    where: {
+      id: customerId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!customer) {
+    redirect(`/customers/${customerId}/edit?error=account`);
+  }
+
+  await prisma.customerAccountEntry.create({
+    data: {
+      customerId,
+      entryType,
+      amount,
+      description: nullableValue(formData, "description"),
+      createdBy: employee,
+    },
+  });
+
+  redirect(`/customers/${customerId}/edit?accountUpdated=1`);
 }
 
 export async function addCustomerVehicle(formData: FormData) {

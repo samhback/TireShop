@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { updateServiceItem } from "@/app/actions";
+import { salesCategoryOptions } from "@/lib/salesCategories";
 import { serviceCategoryOptions } from "@/lib/serviceOptions";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSession } from "@/lib/session";
@@ -137,7 +138,31 @@ export default async function EditServicePage({
 
           <div className="form-section">
             <h2>Status</h2>
+            <div className="form-grid">
+              <div className="field">
+                <label htmlFor="salesCategory">Sales Category</label>
+                <select
+                  defaultValue={service.salesCategory}
+                  id="salesCategory"
+                  name="salesCategory"
+                >
+                  {salesCategoryOptions.map((salesCategory) => (
+                    <option key={salesCategory.value} value={salesCategory.value}>
+                      {salesCategory.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
             <div className="option-row">
+              <label>
+                <input
+                  defaultChecked={service.taxable}
+                  name="taxable"
+                  type="checkbox"
+                />
+                Taxable
+              </label>
               <label>
                 <input
                   defaultChecked={service.active}

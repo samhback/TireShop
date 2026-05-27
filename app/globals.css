@@ -807,6 +807,91 @@ h1 {
   margin: 0;
 }
 
+.account-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+
+.account-metric-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 16px;
+}
+
+.account-metric-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.account-metric-card strong {
+  color: var(--ink);
+  font-size: 24px;
+}
+
+.account-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.account-action-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffdf8;
+  padding: 16px;
+}
+
+.account-action-card h3,
+.account-entry-list h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.account-action-card p {
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+
+.account-entry-list {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  margin-top: 18px;
+  padding: 16px;
+}
+
+.account-entry-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(90px, auto) minmax(90px, auto);
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.account-entry-row p {
+  color: var(--muted);
+  margin: 3px 0 0;
+}
+
+.account-entry-row span,
+.account-entry-row small {
+  text-align: right;
+}
+
 .vehicle-list {
   display: grid;
   gap: 6px;
@@ -1103,6 +1188,35 @@ h1 {
 
 .order-total-row strong {
   font-size: 24px;
+}
+
+.invoice-total-stack {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+}
+
+.invoice-total-stack span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.compact-payment-field {
+  display: grid;
+  gap: 6px;
+  color: #2a342f;
+  font-size: 13px;
+  font-weight: 800;
+  margin: 10px 0;
+}
+
+.compact-payment-field select {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--foreground);
+  padding: 0 10px;
 }
 
 .empty-state {
@@ -1511,6 +1625,15 @@ h1 {
   font-size: 28px;
 }
 
+.quote-total-secondary {
+  margin-top: 8px;
+  font-size: 16px;
+}
+
+.quote-total-secondary strong {
+  font-size: 20px;
+}
+
 .quote-footer {
   border-top: 1px solid var(--line);
   color: var(--muted);
@@ -1646,6 +1769,258 @@ h1 {
   color: #202722;
 }
 
+.sales-receipts-report {
+  color: #000000;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: clamp(14px, 1.25vw, 18px);
+  overflow-x: hidden;
+  width: 100%;
+}
+
+.sales-receipts-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: flex-start;
+  gap: 24px;
+  border-bottom: 1px solid #000000;
+  margin-bottom: 48px;
+  padding-bottom: 18px;
+}
+
+.sales-receipts-header h1 {
+  margin: 0 0 14px;
+  font-size: clamp(22px, 2.2vw, 32px);
+  line-height: 1.2;
+}
+
+.sales-receipts-header p {
+  margin: 0;
+  font-size: clamp(18px, 1.7vw, 27px);
+}
+
+.sales-receipts-header > p {
+  white-space: nowrap;
+}
+
+.accounting-section {
+  width: 100%;
+  margin: 0 0 52px;
+}
+
+.accounting-section h2,
+.posted-sales-header {
+  background: #e9e9e9;
+  font-size: clamp(18px, 1.55vw, 24px);
+  font-weight: 800;
+}
+
+.accounting-section h2 {
+  margin: 0;
+  padding: 10px 50px;
+}
+
+.receipt-lines {
+  display: grid;
+  gap: 16px;
+  width: min(100%, 760px);
+  margin: 8px 0 0 auto;
+}
+
+.receipt-lines div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  gap: 28px;
+  align-items: baseline;
+}
+
+.receipt-lines span {
+  text-align: right;
+}
+
+.receipt-lines strong {
+  font-weight: 400;
+  text-align: right;
+}
+
+.receipt-lines .receipt-total strong {
+  border-top: 1px solid #000000;
+  font-weight: 800;
+  margin-top: -2px;
+  padding-top: 20px;
+}
+
+.posted-sales-header {
+  display: grid;
+  grid-template-columns: minmax(180px, 35%) repeat(3, minmax(0, 1fr));
+  align-items: center;
+  padding: 10px 0;
+}
+
+.posted-sales-header strong:first-child {
+  padding-left: 7%;
+}
+
+.posted-sales-header strong:not(:first-child) {
+  text-align: right;
+}
+
+.posted-sales-body {
+  display: grid;
+  gap: 18px;
+  padding-top: 8px;
+}
+
+.posted-sales-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 35%) repeat(3, minmax(0, 1fr));
+  align-items: baseline;
+}
+
+.posted-sales-row span:first-child {
+  text-align: right;
+}
+
+.posted-sales-row span:not(:first-child),
+.posted-sales-row strong {
+  text-align: right;
+}
+
+.discount-value {
+  color: #ff1d14;
+}
+
+.posted-subtotal {
+  margin-top: 18px;
+}
+
+.posted-subtotal span:first-child,
+.posted-subtotal strong {
+  border-top: 1px solid #000000;
+  padding-top: 12px;
+}
+
+.tax-line {
+  margin-top: 6px;
+}
+
+.total-sales-tax {
+  margin-top: 18px;
+}
+
+.total-sales-tax strong {
+  border-top: 1px solid #000000;
+  padding-top: 12px;
+}
+
+.balance-summary {
+  margin-top: 14px;
+}
+
+.balance-summary span,
+.balance-summary strong,
+.balance-detail span,
+.balance-detail strong {
+  font-size: clamp(17px, 1.45vw, 22px);
+}
+
+.inventory-part-sales-report {
+  color: #000000;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: clamp(14px, 1.2vw, 18px);
+  overflow-x: hidden;
+  width: 100%;
+}
+
+.inventory-part-sales-header {
+  margin-bottom: 44px;
+}
+
+.inventory-part-sales-header h1 {
+  margin: 0 0 18px;
+  font-size: clamp(22px, 2.1vw, 31px);
+  line-height: 1.2;
+}
+
+.inventory-part-sales-dates {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) max-content max-content;
+  align-items: center;
+  gap: 28px;
+  font-size: clamp(16px, 1.65vw, 26px);
+  padding-left: 18px;
+}
+
+.inventory-part-sales-dates strong {
+  font-weight: 400;
+  margin-left: 8px;
+}
+
+.inventory-part-sales-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.inventory-part-sales-table th,
+.inventory-part-sales-table td {
+  padding: 5px 10px 5px 0;
+  text-align: left;
+  vertical-align: top;
+}
+
+.inventory-part-sales-table th {
+  border-bottom: 3px solid #000000;
+  font-weight: 800;
+}
+
+.inventory-part-sales-table th:nth-child(n + 3),
+.inventory-part-sales-table td:nth-child(n + 3) {
+  text-align: right;
+}
+
+.inventory-part-sales-table th:nth-child(1),
+.inventory-part-sales-table td:nth-child(1) {
+  width: 20%;
+}
+
+.inventory-part-sales-table th:nth-child(2),
+.inventory-part-sales-table td:nth-child(2) {
+  width: 48%;
+}
+
+.inventory-part-sales-table th:nth-child(3),
+.inventory-part-sales-table td:nth-child(3) {
+  width: 12%;
+}
+
+.inventory-part-sales-table th:nth-child(4),
+.inventory-part-sales-table td:nth-child(4) {
+  width: 10%;
+}
+
+.inventory-part-sales-table th:nth-child(5),
+.inventory-part-sales-table td:nth-child(5) {
+  width: 10%;
+}
+
+.inventory-part-sales-table tfoot {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.inventory-part-sales-table tfoot td {
+  font-weight: 800;
+  padding-top: 8px;
+}
+
+.inventory-part-sales-table tfoot td:nth-last-child(-n + 2) {
+  border-top: 3px solid #000000;
+  font-size: clamp(17px, 1.5vw, 23px);
+}
+
+.inventory-part-sales-empty {
+  margin: 14px 0;
+}
+
 @media print {
   body {
     background: #ffffff;
@@ -1695,6 +2070,84 @@ h1 {
   .report-table th,
   .report-table td {
     padding: 8px 6px;
+  }
+
+  .sales-receipts-report {
+    font-size: 12px;
+  }
+
+  .sales-receipts-header {
+    grid-template-columns: minmax(0, 1fr) max-content;
+    gap: 16px;
+  }
+
+  .sales-receipts-header h1 {
+    font-size: 22px;
+  }
+
+  .sales-receipts-header p {
+    font-size: 18px;
+  }
+
+  .inventory-part-sales-report {
+    font-size: 12px;
+  }
+
+  .inventory-part-sales-header h1 {
+    font-size: 22px;
+  }
+
+  .inventory-part-sales-dates {
+    grid-template-columns: minmax(0, 1fr) max-content max-content;
+    gap: 18px;
+    padding-left: 12px;
+    font-size: 16px;
+  }
+
+  .inventory-part-sales-dates span {
+    white-space: nowrap;
+  }
+
+  .accounting-section {
+    width: 100%;
+  }
+
+  .sales-receipts-header {
+    margin-bottom: 44px;
+  }
+
+  .posted-sales-header,
+  .posted-sales-row {
+    grid-template-columns: 32% 20% 24% 24%;
+  }
+
+  .receipt-lines {
+    margin-left: auto;
+    width: 72%;
+  }
+}
+
+@media (max-width: 900px) {
+  .sales-receipts-header {
+    display: grid;
+  }
+
+  .receipt-lines {
+    width: 100%;
+  }
+
+  .receipt-lines div {
+    grid-template-columns: minmax(0, 1fr) 150px;
+  }
+
+  .posted-sales-header,
+  .posted-sales-row {
+    grid-template-columns: minmax(130px, 34%) repeat(3, minmax(90px, 1fr));
+    column-gap: 8px;
+  }
+
+  .posted-sales-header strong:first-child {
+    padding-left: 0;
   }
 }
 

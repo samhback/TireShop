@@ -17,6 +17,18 @@ import { getEmployeeSession } from "@/lib/session";
 
 const reports = [
   {
+    title: "Sales Receipts Summary",
+    description: "Monthly accounting summary of paid receipts, payment methods, tax, and totals.",
+    href: "/reports/sales-receipts-summary",
+    icon: Receipt,
+  },
+  {
+    title: "Inventory Part Sales",
+    description: "Parts sold by date range with quantity, cost, revenue, tax status, and profit.",
+    href: "/reports/inventory-part-sales",
+    icon: PackageSearch,
+  },
+  {
     title: "Revenue Report",
     description: "Invoiced totals, paid totals, unpaid balances, and service vs inventory revenue.",
     href: "/reports/revenue",
