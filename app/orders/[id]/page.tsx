@@ -90,6 +90,7 @@ export default async function OrderDetailPage({
     include: {
       customer: {
         include: {
+          company: true,
           vehicles: {
             include: {
               _count: {
@@ -136,11 +137,13 @@ export default async function OrderDetailPage({
       name: "asc",
     },
   });
-  const companies = await prisma.company.findMany({
-    orderBy: {
-      name: "asc",
-    },
-  });
+  const companyForOrder = order.companyId
+    ? {
+        id: order.companyId,
+        name: order.companyNameSnapshot ?? order.customer.company?.name ?? "Company",
+      }
+    : order.customer.company;
+  const canApplyCompanyPricing = Boolean(companyForOrder);
   const subtotal = order.lineItems.reduce(
     (total, item) => total + Number(item.lineTotal.toString()),
     0,
@@ -301,34 +304,34 @@ export default async function OrderDetailPage({
               data-preserve-scroll="true"
             >
               <input name="orderId" type="hidden" value={order.id} />
-              <div className="field quoted-by-auto-field">
-                <label htmlFor="companyId">Company</label>
-                <select
-                  defaultValue={order.companyId?.toString() ?? ""}
-                  disabled={["completed", "canceled"].includes(order.status)}
-                  id="companyId"
-                  name="companyId"
-                >
-                  <option value="">No company</option>
-                  {companies.map((company) => (
-                    <option key={company.id} value={company.id}>
-                      {company.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <input
+                name="companyId"
+                type="hidden"
+                value={companyForOrder?.id ?? ""}
+              />
               <label className="checkbox-line company-car-toggle">
                 <input
                   defaultChecked={order.isCompanyCar}
-                  disabled={["completed", "canceled"].includes(order.status)}
+                  disabled={
+                    ["completed", "canceled"].includes(order.status) ||
+                    !canApplyCompanyPricing
+                  }
                   name="isCompanyCar"
                   type="checkbox"
                 />
-                Company Car
+                <span className="company-car-label">
+                  <span>Company Car</span>
+                  <span className="company-car-company">
+                    {companyForOrder?.name ?? "No company assigned"}
+                  </span>
+                </span>
               </label>
               <button
                 className="secondary-button company-pricing-button"
-                disabled={["completed", "canceled"].includes(order.status)}
+                disabled={
+                  ["completed", "canceled"].includes(order.status) ||
+                  !canApplyCompanyPricing
+                }
                 type="submit"
               >
                 Apply

@@ -599,9 +599,10 @@ h1 {
 
 .company-pricing-form {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) auto auto;
+  grid-template-columns: auto auto;
   gap: 12px;
   align-items: end;
+  justify-content: end;
   justify-self: stretch;
   margin: 0;
 }
@@ -612,18 +613,36 @@ h1 {
 
 .company-car-toggle {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   min-height: 44px;
   color: #2a342f;
   font-weight: 800;
   white-space: nowrap;
+  padding-top: 10px;
 }
 
 .company-car-toggle input {
   width: 16px;
   height: 16px;
   accent-color: var(--primary);
+  margin-top: 2px;
+}
+
+.company-car-label {
+  display: grid;
+  gap: 2px;
+}
+
+.company-car-company {
+  display: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.company-car-toggle input:checked + .company-car-label .company-car-company {
+  display: block;
 }
 
 .company-pricing-button {
