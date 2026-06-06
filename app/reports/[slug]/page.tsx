@@ -24,6 +24,7 @@ type InvoiceWithDetails = Prisma.InvoiceGetPayload<{
     order: {
       include: {
         quotedByEmployee: true;
+        company: true;
         lineItems: {
           include: {
             inventoryItem: true;
@@ -42,6 +43,7 @@ const reportTitles: Record<string, string> = {
   "inventory-part-sales": "Inventory Part Sales",
   "revenue": "Revenue Report",
   "profit": "Profit Report",
+  "company-profit": "Company Profit Report",
   "inventory-used": "Inventory Used Report",
   "low-stock": "Low Stock Report",
   "employee-revenue": "Employee Revenue Report",
@@ -145,6 +147,7 @@ async function getInvoices(start: Date, end: Date) {
       order: {
         include: {
           quotedByEmployee: true,
+          company: true,
           lineItems: {
             include: {
               inventoryItem: true,
@@ -691,6 +694,114 @@ function profitReport(invoices: InvoiceWithDetails[]) {
   );
 }
 
+function companyProfitReport(invoices: InvoiceWithDetails[]) {
+  const rows = new Map<
+    string,
+    {
+      company: string;
+      invoiceCount: number;
+      revenue: number;
+      inventoryCost: number;
+      grossProfit: number;
+      lastInvoice: Date;
+    }
+  >();
+
+  invoices
+    .filter((invoice) => invoice.order.isCompanyCar)
+    .forEach((invoice) => {
+      const companyKey =
+        invoice.order.companyId?.toString() ??
+        invoice.order.companyNameSnapshot ??
+        "unknown-company";
+      const companyName =
+        invoice.order.companyNameSnapshot ??
+        invoice.order.company?.name ??
+        "Unknown Company";
+      const existing = rows.get(companyKey) ?? {
+        company: companyName,
+        invoiceCount: 0,
+        revenue: 0,
+        inventoryCost: 0,
+        grossProfit: 0,
+        lastInvoice: invoice.createdAt,
+      };
+      const revenue = invoice.lineItems.reduce(
+        (sum, line) => sum + decimal(line.lineTotal),
+        0,
+      );
+      const inventoryCost = invoice.lineItems
+        .filter((line) => line.lineType === "inventory")
+        .reduce(
+          (sum, line) => sum + decimal(line.quantity) * decimal(line.costAtSale),
+          0,
+        );
+
+      existing.company = companyName;
+      existing.invoiceCount += 1;
+      existing.revenue += revenue;
+      existing.inventoryCost += inventoryCost;
+      existing.grossProfit += revenue - inventoryCost;
+      existing.lastInvoice =
+        invoice.createdAt > existing.lastInvoice ? invoice.createdAt : existing.lastInvoice;
+      rows.set(companyKey, existing);
+    });
+
+  const reportRows = [...rows.values()].sort(
+    (first, second) => second.grossProfit - first.grossProfit,
+  );
+  const totalRevenue = reportRows.reduce((sum, row) => sum + row.revenue, 0);
+  const totalInventoryCost = reportRows.reduce(
+    (sum, row) => sum + row.inventoryCost,
+    0,
+  );
+  const totalProfit = reportRows.reduce((sum, row) => sum + row.grossProfit, 0);
+  const totalInvoices = reportRows.reduce((sum, row) => sum + row.invoiceCount, 0);
+  const grossMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+
+  return (
+    <>
+      <p className="report-note">
+        Company profit includes invoices marked as company cars. Inventory cost uses the cost stored on each invoice line at the time the invoice was created.
+      </p>
+      <MetricGrid
+        metrics={[
+          { label: "Company Invoices", value: String(totalInvoices) },
+          { label: "Company Revenue", value: `$${money(totalRevenue)}` },
+          { label: "Inventory Cost", value: `$${money(totalInventoryCost)}` },
+          { label: "Estimated Gross Profit", value: `$${money(totalProfit)}` },
+          { label: "Gross Margin", value: `${money(grossMargin)}%` },
+        ]}
+      />
+      <ReportTable
+        columns={[
+          "Company",
+          "Invoices",
+          "Revenue",
+          "Inventory Cost",
+          "Gross Profit",
+          "Gross Margin",
+          "Last Invoice",
+        ]}
+        rows={reportRows.map((row) => {
+          const rowMargin =
+            row.revenue > 0 ? (row.grossProfit / row.revenue) * 100 : 0;
+
+          return [
+            row.company,
+            row.invoiceCount,
+            `$${money(row.revenue)}`,
+            `$${money(row.inventoryCost)}`,
+            `$${money(row.grossProfit)}`,
+            `${money(rowMargin)}%`,
+            formatDate(row.lastInvoice),
+          ];
+        })}
+      />
+    </>
+  );
+}
+
 function inventoryUsedReport(invoices: InvoiceWithDetails[]) {
   const rows = new Map<
     string,
@@ -1015,6 +1126,7 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
     content = await inventoryPartSalesReport(invoices, start, end);
   }
   if (slug === "profit") content = profitReport(invoices);
+  if (slug === "company-profit") content = companyProfitReport(invoices);
   if (slug === "inventory-used") content = inventoryUsedReport(invoices);
   if (slug === "low-stock") content = await lowStockReport();
   if (slug === "employee-revenue") content = employeeRevenueReport(invoices);

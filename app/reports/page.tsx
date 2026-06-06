@@ -41,6 +41,12 @@ const reports = [
     icon: LineChart,
   },
   {
+    title: "Company Profit",
+    description: "Estimated gross profit by company-car invoices and inventory cost at sale.",
+    href: "/reports/company-profit",
+    icon: DollarSign,
+  },
+  {
     title: "Inventory Used",
     description: "Inventory quantities sold, revenue, estimated cost, and estimated profit.",
     href: "/reports/inventory-used",
