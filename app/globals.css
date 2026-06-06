@@ -1809,7 +1809,8 @@ h1 {
   font-weight: 800;
 }
 
-.report-filter input {
+.report-filter input,
+.report-filter select {
   min-height: 40px;
   border: 1px solid var(--line);
   border-radius: 6px;

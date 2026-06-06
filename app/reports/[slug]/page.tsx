@@ -13,6 +13,7 @@ type ReportPageProps = {
   searchParams?: Promise<{
     start?: string;
     end?: string;
+    companyId?: string;
     q?: string;
   }>;
 };
@@ -189,6 +190,48 @@ function DateFilter({ end, start }: { end: Date; start: Date }) {
       <label>
         End
         <input name="end" type="date" defaultValue={inputDate(end)} />
+      </label>
+      <button className="secondary-button" type="submit">
+        Run Report
+      </button>
+    </form>
+  );
+}
+
+function CompanyProfitFilter({
+  companies,
+  end,
+  selectedCompanyId,
+  start,
+}: {
+  companies: { id: number; name: string }[];
+  end: Date;
+  selectedCompanyId: number | null;
+  start: Date;
+}) {
+  return (
+    <form className="report-filter print-hidden">
+      <label>
+        Start
+        <input name="start" type="date" defaultValue={inputDate(start)} />
+      </label>
+      <label>
+        End
+        <input name="end" type="date" defaultValue={inputDate(end)} />
+      </label>
+      <label>
+        Company
+        <select
+          name="companyId"
+          defaultValue={selectedCompanyId?.toString() ?? ""}
+        >
+          <option value="">All companies</option>
+          {companies.map((company) => (
+            <option key={company.id} value={company.id}>
+              {company.name}
+            </option>
+          ))}
+        </select>
       </label>
       <button className="secondary-button" type="submit">
         Run Report
@@ -1112,9 +1155,31 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
   const search = await searchParams;
   const { start, end } = reportRange(search);
   const usesDateRange = !["low-stock", "vehicle-history"].includes(slug);
+  const selectedCompanyIdParam = search?.companyId?.trim() ?? "";
+  const selectedCompanyIdValue = Number(selectedCompanyIdParam);
+  const selectedCompanyId =
+    selectedCompanyIdParam && Number.isInteger(selectedCompanyIdValue)
+    ? selectedCompanyIdValue
+    : null;
   const invoices = usesDateRange ? await getInvoices(start, end) : [];
   const accountEntries =
     slug === "sales-receipts-summary" ? await getAccountEntries(start, end) : [];
+  const companies =
+    slug === "company-profit"
+      ? await prisma.company.findMany({
+          orderBy: {
+            name: "asc",
+          },
+          select: {
+            id: true,
+            name: true,
+          },
+        })
+      : [];
+  const companyProfitInvoices =
+    selectedCompanyId === null
+      ? invoices
+      : invoices.filter((invoice) => invoice.order.companyId === selectedCompanyId);
 
   let content;
 
@@ -1126,7 +1191,9 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
     content = await inventoryPartSalesReport(invoices, start, end);
   }
   if (slug === "profit") content = profitReport(invoices);
-  if (slug === "company-profit") content = companyProfitReport(invoices);
+  if (slug === "company-profit") {
+    content = companyProfitReport(companyProfitInvoices);
+  }
   if (slug === "inventory-used") content = inventoryUsedReport(invoices);
   if (slug === "low-stock") content = await lowStockReport();
   if (slug === "employee-revenue") content = employeeRevenueReport(invoices);
@@ -1164,7 +1231,14 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
           </header>
         ) : null}
 
-        {usesDateRange ? (
+        {slug === "company-profit" ? (
+          <CompanyProfitFilter
+            companies={companies}
+            end={end}
+            selectedCompanyId={selectedCompanyId}
+            start={start}
+          />
+        ) : usesDateRange ? (
           <DateFilter end={end} start={start} />
         ) : slug === "vehicle-history" ? (
           <SearchFilter defaultValue={search?.q ?? ""} />
