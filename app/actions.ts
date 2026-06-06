@@ -1437,6 +1437,7 @@ export async function updateOrderCompanyCar(formData: FormData) {
   const orderId = Number(formData.get("orderId"));
   const isCompanyCar = formData.get("isCompanyCar") === "on";
   const companyId = optionalIntegerValue(formData, "companyId");
+  const redirectOnSave = formData.get("redirectOnSave") !== "false";
 
   if (
     !Number.isInteger(orderId) ||
@@ -1486,7 +1487,9 @@ export async function updateOrderCompanyCar(formData: FormData) {
 
   await recalculateCompanyInventoryLines(orderId);
 
-  redirect(`/orders/${orderId}?companyUpdated=1`);
+  if (redirectOnSave) {
+    redirect(`/orders/${orderId}?companyUpdated=1`);
+  }
 }
 
 export async function searchOrders(query: string) {

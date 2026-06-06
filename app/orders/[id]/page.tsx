@@ -9,12 +9,12 @@ import {
   createVehicleForOrder,
   rejectQuote,
   removeOrderLineItem,
-  updateOrderCompanyCar,
   updateOrderLineItemAdjustment,
 } from "@/app/actions";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSession } from "@/lib/session";
 import { VehicleFields } from "@/app/customers/VehicleFields";
+import { CompanyCarToggle } from "./CompanyCarToggle";
 import { OrderLineItemSearch } from "./OrderLineItemSearch";
 import { PerformedBySelect } from "./PerformedBySelect";
 import { QuoteLink } from "./QuoteLink";
@@ -298,45 +298,16 @@ export default async function OrderDetailPage({
               quotedByEmployeeId={order.quotedByEmployeeId}
             />
 
-            <form
-              action={updateOrderCompanyCar}
-              className="company-pricing-form"
-              data-preserve-scroll="true"
-            >
-              <input name="orderId" type="hidden" value={order.id} />
-              <input
-                name="companyId"
-                type="hidden"
-                value={companyForOrder?.id ?? ""}
+            <div className="company-pricing-form">
+              <CompanyCarToggle
+                canApply={canApplyCompanyPricing}
+                companyId={companyForOrder?.id ?? null}
+                companyName={companyForOrder?.name ?? "No company assigned"}
+                disabled={["completed", "canceled"].includes(order.status)}
+                isCompanyCar={order.isCompanyCar}
+                orderId={order.id}
               />
-              <label className="checkbox-line company-car-toggle">
-                <input
-                  defaultChecked={order.isCompanyCar}
-                  disabled={
-                    ["completed", "canceled"].includes(order.status) ||
-                    !canApplyCompanyPricing
-                  }
-                  name="isCompanyCar"
-                  type="checkbox"
-                />
-                <span className="company-car-label">
-                  <span>Company Car</span>
-                  <span className="company-car-company">
-                    {companyForOrder?.name ?? "No company assigned"}
-                  </span>
-                </span>
-              </label>
-              <button
-                className="secondary-button company-pricing-button"
-                disabled={
-                  ["completed", "canceled"].includes(order.status) ||
-                  !canApplyCompanyPricing
-                }
-                type="submit"
-              >
-                Apply
-              </button>
-            </form>
+            </div>
           </div>
 
           <div className="quote-status-actions">

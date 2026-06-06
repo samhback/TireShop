@@ -598,10 +598,8 @@ h1 {
 }
 
 .company-pricing-form {
-  display: grid;
-  grid-template-columns: auto auto;
-  gap: 12px;
-  align-items: end;
+  display: flex;
+  align-items: flex-end;
   justify-content: end;
   justify-self: stretch;
   margin: 0;
@@ -635,20 +633,9 @@ h1 {
 }
 
 .company-car-company {
-  display: none;
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
-}
-
-.company-car-toggle input:checked + .company-car-label .company-car-company {
-  display: block;
-}
-
-.company-pricing-button {
-  min-height: 44px;
-  padding-inline: 22px;
-  white-space: nowrap;
 }
 
 .quote-status-actions {
