@@ -986,6 +986,61 @@ h1 {
   padding: 18px;
 }
 
+.company-history-list {
+  display: grid;
+  gap: 14px;
+}
+
+.company-history-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffdf8;
+  padding: 16px;
+}
+
+.company-history-card h3 {
+  margin: 4px 0 6px;
+  font-size: 20px;
+}
+
+.company-history-card p {
+  color: var(--muted);
+  margin: 3px 0 0;
+}
+
+.company-history-actions {
+  display: grid;
+  gap: 10px;
+  justify-items: end;
+}
+
+.company-history-actions strong {
+  color: var(--primary-dark);
+  font-size: 22px;
+}
+
+.company-history-line-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  border-top: 1px solid var(--line);
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.company-history-lines {
+  display: grid;
+  gap: 6px;
+  color: #39443e;
+  margin: 10px 0 0;
+  padding-left: 18px;
+}
+
+.company-history-empty {
+  color: var(--muted);
+  margin-top: 10px;
+}
+
 .service-preview {
   margin-top: 30px;
 }
@@ -2266,6 +2321,7 @@ h1 {
   }
 
   .order-builder-grid,
+  .company-history-line-grid,
   .line-item-row,
   .order-workspace-header,
   .order-control-panel,

@@ -20,6 +20,40 @@ function moneyPercent(value: { toString(): string }) {
   return Number(value.toString()).toFixed(2);
 }
 
+function money(value: { toString(): string } | number) {
+  return Number(value.toString()).toFixed(2);
+}
+
+function formatDate(value: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+  }).format(value);
+}
+
+function vehicleLabel(vehicle: {
+  year: string;
+  make: string;
+  model: string;
+  color: string | null;
+  licensePlate: string | null;
+  vin: string | null;
+} | null) {
+  if (!vehicle) {
+    return "No vehicle attached";
+  }
+
+  return [
+    vehicle.color,
+    vehicle.year,
+    vehicle.make,
+    vehicle.model,
+    vehicle.licensePlate ? `Plate ${vehicle.licensePlate}` : null,
+    vehicle.vin ? `VIN ${vehicle.vin}` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 export default async function CompanyPage({
   params,
   searchParams,
@@ -59,6 +93,29 @@ export default async function CompanyPage({
   if (!company) {
     notFound();
   }
+
+  const companyInvoices = await prisma.invoice.findMany({
+    where: {
+      order: {
+        companyId: company.id,
+        isCompanyCar: true,
+      },
+    },
+    include: {
+      customer: true,
+      vehicle: true,
+      order: true,
+      lineItems: {
+        orderBy: {
+          createdAt: "asc",
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: 50,
+  });
 
   const paramsValue = await searchParams;
 
@@ -163,6 +220,89 @@ export default async function CompanyPage({
         <div className="form-section">
           <h2>Add Employee</h2>
           <CompanyEmployeeSearch companyId={company.id} />
+        </div>
+
+        <div className="form-section service-preview">
+          <h2>Company Vehicle History</h2>
+          {companyInvoices.length > 0 ? (
+            <div className="company-history-list">
+              {companyInvoices.map((invoice) => {
+                const serviceLines = invoice.lineItems.filter(
+                  (item) => item.lineType === "service",
+                );
+                const inventoryLines = invoice.lineItems.filter(
+                  (item) => item.lineType === "inventory",
+                );
+
+                return (
+                  <article className="company-history-card" key={invoice.id}>
+                    <div className="section-heading-row">
+                      <div>
+                        <p className="eyebrow">{formatDate(invoice.createdAt)}</p>
+                        <h3>{vehicleLabel(invoice.vehicle)}</h3>
+                        <p>
+                          Employee: {invoice.customer.firstName}{" "}
+                          {invoice.customer.lastName}
+                        </p>
+                        <p>
+                          Order {invoice.order.orderNumber} | {invoice.invoiceNumber}
+                        </p>
+                      </div>
+                      <div className="company-history-actions">
+                        <strong>${money(invoice.total)}</strong>
+                        <Link
+                          className="secondary-link-button"
+                          href={`/invoices/${invoice.id}`}
+                        >
+                          Open Invoice
+                        </Link>
+                      </div>
+                    </div>
+
+                    <div className="company-history-line-grid">
+                      <div>
+                        <span className="role-label">Services</span>
+                        {serviceLines.length > 0 ? (
+                          <ul className="company-history-lines">
+                            {serviceLines.map((item) => (
+                              <li key={item.id}>
+                                {item.description}
+                                {item.performedByName
+                                  ? ` | Performed by ${item.performedByName}`
+                                  : ""}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="company-history-empty">No services.</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <span className="role-label">Inventory</span>
+                        {inventoryLines.length > 0 ? (
+                          <ul className="company-history-lines">
+                            {inventoryLines.map((item) => (
+                              <li key={item.id}>
+                                {money(item.quantity)} x {item.description}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="company-history-empty">No inventory.</p>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="empty-state">
+              <h2>No company vehicle history yet</h2>
+              <p>Completed company-car invoices for this company will show here.</p>
+            </div>
+          )}
         </div>
       </section>
     </main>
