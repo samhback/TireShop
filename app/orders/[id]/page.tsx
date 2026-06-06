@@ -285,54 +285,56 @@ export default async function OrderDetailPage({
         ) : null}
 
         <section className="order-control-panel">
-          <QuotedBySelect
-            employees={employees.map((employeeProfile) => ({
-              id: employeeProfile.id,
-              name: employeeProfile.name,
-            }))}
-            orderId={order.id}
-            quotedByEmployeeId={order.quotedByEmployeeId}
-          />
+          <div className="order-settings-row">
+            <QuotedBySelect
+              employees={employees.map((employeeProfile) => ({
+                id: employeeProfile.id,
+                name: employeeProfile.name,
+              }))}
+              orderId={order.id}
+              quotedByEmployeeId={order.quotedByEmployeeId}
+            />
 
-          <form
-            action={updateOrderCompanyCar}
-            className="quoted-by-form"
-            data-preserve-scroll="true"
-          >
-            <input name="orderId" type="hidden" value={order.id} />
-            <div className="field quoted-by-auto-field">
-              <label htmlFor="companyId">Company</label>
-              <select
-                defaultValue={order.companyId?.toString() ?? ""}
-                disabled={["completed", "canceled"].includes(order.status)}
-                id="companyId"
-                name="companyId"
-              >
-                <option value="">No company</option>
-                {companies.map((company) => (
-                  <option key={company.id} value={company.id}>
-                    {company.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <label className="checkbox-line">
-              <input
-                defaultChecked={order.isCompanyCar}
-                disabled={["completed", "canceled"].includes(order.status)}
-                name="isCompanyCar"
-                type="checkbox"
-              />
-              Company Car
-            </label>
-            <button
-              className="secondary-button"
-              disabled={["completed", "canceled"].includes(order.status)}
-              type="submit"
+            <form
+              action={updateOrderCompanyCar}
+              className="company-pricing-form"
+              data-preserve-scroll="true"
             >
-              Apply Company Pricing
-            </button>
-          </form>
+              <input name="orderId" type="hidden" value={order.id} />
+              <div className="field quoted-by-auto-field">
+                <label htmlFor="companyId">Company</label>
+                <select
+                  defaultValue={order.companyId?.toString() ?? ""}
+                  disabled={["completed", "canceled"].includes(order.status)}
+                  id="companyId"
+                  name="companyId"
+                >
+                  <option value="">No company</option>
+                  {companies.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <label className="checkbox-line company-car-toggle">
+                <input
+                  defaultChecked={order.isCompanyCar}
+                  disabled={["completed", "canceled"].includes(order.status)}
+                  name="isCompanyCar"
+                  type="checkbox"
+                />
+                Company Car
+              </label>
+              <button
+                className="secondary-button company-pricing-button"
+                disabled={["completed", "canceled"].includes(order.status)}
+                type="submit"
+              >
+                Apply
+              </button>
+            </form>
+          </div>
 
           <div className="quote-status-actions">
             {order.status === "canceled" ? (

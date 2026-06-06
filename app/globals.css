@@ -582,14 +582,54 @@ h1 {
 
 .order-control-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 18px;
-  align-items: end;
+  gap: 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
   margin: 22px 0;
   padding: 18px;
+}
+
+.order-settings-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: end;
+}
+
+.company-pricing-form {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto auto;
+  gap: 12px;
+  align-items: end;
+  justify-self: stretch;
+  margin: 0;
+}
+
+.company-pricing-form .field {
+  margin-bottom: 0;
+}
+
+.company-car-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: #2a342f;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.company-car-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+
+.company-pricing-button {
+  min-height: 44px;
+  padding-inline: 22px;
+  white-space: nowrap;
 }
 
 .quote-status-actions {
@@ -598,7 +638,9 @@ h1 {
   gap: 12px;
   align-items: flex-start;
   justify-content: flex-end;
+  border-top: 1px solid var(--line);
   margin: 0;
+  padding-top: 16px;
 }
 
 .quoted-by-form {
@@ -2235,6 +2277,16 @@ h1 {
 
   .quote-status-actions {
     justify-content: flex-start;
+  }
+
+  .order-settings-row,
+  .company-pricing-form {
+    grid-template-columns: 1fr;
+  }
+
+  .company-car-toggle,
+  .company-pricing-button {
+    justify-self: start;
   }
 
   .line-item-amounts {
