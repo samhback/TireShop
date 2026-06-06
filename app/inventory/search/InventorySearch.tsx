@@ -84,6 +84,16 @@ export function InventorySearch({ defaultItems }: InventorySearchProps) {
                 </span>
                 <h2>{result.name}</h2>
                 <p>{resultSubtitle(result) || "No additional details"}</p>
+                {result.regularTireDisposal || result.semiTireDisposal ? (
+                  <p>
+                    {[
+                      result.regularTireDisposal ? "Regular disposal $3" : null,
+                      result.semiTireDisposal ? "Semi disposal $6" : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" | ")}
+                  </p>
+                ) : null}
                 <Link
                   className="secondary-link-button inline-action-link"
                   href={`/inventory/${result.id}/edit`}

@@ -30,6 +30,8 @@ type InventoryOption = {
   tireSize: string | null;
   quantity: number;
   sellPrice: string;
+  regularTireDisposal: boolean;
+  semiTireDisposal: boolean;
 };
 
 type QuickLine = {
@@ -169,8 +171,11 @@ export function QuickInvoiceForm({
     }),
     ...inventoryLines.map((line) => {
       const item = inventoryMap.get(line.id);
+      const disposalFee =
+        (item?.regularTireDisposal ? 3 : 0) +
+        (item?.semiTireDisposal ? 6 : 0);
 
-      return line.quantity * Number(item?.sellPrice ?? 0);
+      return line.quantity * (Number(item?.sellPrice ?? 0) + disposalFee);
     }),
   ].reduce((sum, value) => sum + value, 0);
 
@@ -317,6 +322,18 @@ export function QuickInvoiceForm({
                       <p>
                         ${item.sellPrice} | Available {item.quantity}
                       </p>
+                      {item.regularTireDisposal || item.semiTireDisposal ? (
+                        <p>
+                          {[
+                            item.regularTireDisposal
+                              ? "Regular disposal $3"
+                              : null,
+                            item.semiTireDisposal ? "Semi disposal $6" : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" | ")}
+                        </p>
+                      ) : null}
                       <p>{inventoryLabel(item)}</p>
                     </div>
                     <div className="inline-qty-form">

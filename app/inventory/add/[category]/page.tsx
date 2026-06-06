@@ -150,6 +150,14 @@ export default async function AddInventoryCategoryPage({
                 <input defaultChecked name="taxable" type="checkbox" />
                 Taxable
               </label>
+              <label>
+                <input name="regularTireDisposal" type="checkbox" />
+                Regular Tire Disposal
+              </label>
+              <label>
+                <input name="semiTireDisposal" type="checkbox" />
+                Semi Tire Disposal
+              </label>
             </div>
           </div>
 

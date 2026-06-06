@@ -34,6 +34,8 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
     quantity: item.quantity,
     cost: item.cost.toString(),
     sellPrice: item.sellPrice.toString(),
+    regularTireDisposal: item.regularTireDisposal,
+    semiTireDisposal: item.semiTireDisposal,
     lowStockThreshold: item.lowStockThreshold,
     tireSize: item.tireSize,
     model: item.model,

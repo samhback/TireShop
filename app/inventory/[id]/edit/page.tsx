@@ -196,6 +196,22 @@ export default async function EditInventoryPage({
                 />
                 Taxable
               </label>
+              <label>
+                <input
+                  defaultChecked={item.regularTireDisposal}
+                  name="regularTireDisposal"
+                  type="checkbox"
+                />
+                Regular Tire Disposal
+              </label>
+              <label>
+                <input
+                  defaultChecked={item.semiTireDisposal}
+                  name="semiTireDisposal"
+                  type="checkbox"
+                />
+                Semi Tire Disposal
+              </label>
             </div>
           </div>
 

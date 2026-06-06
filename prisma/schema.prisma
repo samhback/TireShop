@@ -44,6 +44,8 @@ model InventoryItem {
   cost              Decimal         @db.Decimal(10, 2)
   sellPrice         Decimal         @map("sell_price") @db.Decimal(10, 2)
   taxable           Boolean         @default(true)
+  regularTireDisposal Boolean       @default(false) @map("regular_tire_disposal")
+  semiTireDisposal    Boolean       @default(false) @map("semi_tire_disposal")
   salesCategory     String          @default("parts") @map("sales_category")
   lowStockThreshold Int             @default(0) @map("low_stock_threshold")
   notes             String?

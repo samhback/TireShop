@@ -285,6 +285,62 @@ function calculateInvoiceTotals(
   };
 }
 
+const REGULAR_TIRE_DISPOSAL_FEE = 3;
+const SEMI_TIRE_DISPOSAL_FEE = 6;
+const REGULAR_TIRE_DISPOSAL_DESCRIPTION = "Regular Tire Disposal";
+const SEMI_TIRE_DISPOSAL_DESCRIPTION = "Semi Tire Disposal";
+
+function isTireDisposalLine(description: string) {
+  return (
+    description === REGULAR_TIRE_DISPOSAL_DESCRIPTION ||
+    description === SEMI_TIRE_DISPOSAL_DESCRIPTION
+  );
+}
+
+function tireDisposalLines(
+  item: {
+    name: string;
+    regularTireDisposal: boolean;
+    semiTireDisposal: boolean;
+  },
+  quantity: number,
+) {
+  const lines = [];
+
+  if (item.regularTireDisposal) {
+    lines.push({
+      description: REGULAR_TIRE_DISPOSAL_DESCRIPTION,
+      unitPrice: REGULAR_TIRE_DISPOSAL_FEE,
+    });
+  }
+
+  if (item.semiTireDisposal) {
+    lines.push({
+      description: SEMI_TIRE_DISPOSAL_DESCRIPTION,
+      unitPrice: SEMI_TIRE_DISPOSAL_FEE,
+    });
+  }
+
+  return lines.map((line) => ({
+    lineType: "custom",
+    serviceItemId: null,
+    inventoryItemId: null,
+    category: "fees",
+    salesCategory: "parts",
+    description: line.description,
+    quantity,
+    unitPrice: line.unitPrice,
+    costAtSale: null,
+    discountPercent: 0,
+    complementary: false,
+    lineTotal: orderLineTotal(quantity, line.unitPrice),
+    taxable: false,
+    taxAmount: 0,
+    notes: `For ${item.name}`,
+    performedByName: null,
+  }));
+}
+
 type QuickInvoiceLineInput = {
   id?: unknown;
   quantity?: unknown;
@@ -430,6 +486,8 @@ export async function createInventoryItem(formData: FormData) {
       cost,
       sellPrice,
       taxable: formData.get("taxable") === "on",
+      regularTireDisposal: formData.get("regularTireDisposal") === "on",
+      semiTireDisposal: formData.get("semiTireDisposal") === "on",
       salesCategory,
       lowStockThreshold,
       notes: nullableValue(formData, "notes"),
@@ -509,6 +567,8 @@ export async function updateInventoryItem(formData: FormData) {
       cost,
       sellPrice,
       taxable: formData.get("taxable") === "on",
+      regularTireDisposal: formData.get("regularTireDisposal") === "on",
+      semiTireDisposal: formData.get("semiTireDisposal") === "on",
       salesCategory,
       lowStockThreshold,
       notes: nullableValue(formData, "notes"),
@@ -763,6 +823,8 @@ export async function searchInventory(query: string) {
     quantity: item.quantity,
     cost: item.cost.toString(),
     sellPrice: item.sellPrice.toString(),
+    regularTireDisposal: item.regularTireDisposal,
+    semiTireDisposal: item.semiTireDisposal,
     lowStockThreshold: item.lowStockThreshold,
     tireSize: item.tireSize,
     model: item.model,
@@ -1534,23 +1596,35 @@ export async function addInventoryToOrder(formData: FormData) {
 
   const unitPrice = Number(item.sellPrice.toString());
 
-  await prisma.orderLineItem.create({
-    data: {
-      orderId,
-      lineType: "inventory",
-      inventoryItemId: item.id,
-      description: item.name,
-      quantity,
-      unitPrice,
-      lineTotal: orderLineTotal(quantity, unitPrice),
-      notes: [
-        item.brand,
-        item.partNumber ? `Part # ${item.partNumber}` : null,
-        item.tireSize,
-      ]
-        .filter(Boolean)
-        .join(" | ") || null,
-    },
+  await prisma.orderLineItem.createMany({
+    data: [
+      {
+        orderId,
+        lineType: "inventory",
+        inventoryItemId: item.id,
+        description: item.name,
+        quantity,
+        unitPrice,
+        lineTotal: orderLineTotal(quantity, unitPrice),
+        notes:
+          [
+            item.brand,
+            item.partNumber ? `Part # ${item.partNumber}` : null,
+            item.tireSize,
+          ]
+            .filter(Boolean)
+            .join(" | ") || null,
+      },
+      ...tireDisposalLines(item, quantity).map((line) => ({
+        orderId,
+        lineType: line.lineType,
+        description: line.description,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        lineTotal: line.lineTotal,
+        notes: line.notes,
+      })),
+    ],
   });
 
   redirect(`/orders/${orderId}?lineAdded=1`);
@@ -1810,6 +1884,8 @@ export async function completeOrder(formData: FormData) {
         ? lineItem.inventoryItem?.taxable ?? true
         : lineItem.lineType === "service"
           ? lineItem.serviceItem?.taxable ?? true
+          : isTireDisposalLine(lineItem.description)
+            ? false
           : true;
 
     return {
@@ -1994,13 +2070,13 @@ export async function createQuickInvoice(formData: FormData) {
     };
   });
 
-  const inventoryOrderLines = inventoryLines.map((line) => {
+  const inventoryOrderLines = inventoryLines.flatMap((line) => {
     const item = inventoryItems.find(
       (inventoryItem) => inventoryItem.id === line.id,
     )!;
     const unitPrice = Number(item.sellPrice.toString());
 
-    return {
+    const inventoryLine = {
       lineType: "inventory",
       serviceItemId: null,
       inventoryItemId: item.id,
@@ -2021,6 +2097,8 @@ export async function createQuickInvoice(formData: FormData) {
           .join(" | ") || null,
       performedByName: null,
     };
+
+    return [inventoryLine, ...tireDisposalLines(item, line.quantity)];
   });
 
   const lineItems = [...serviceOrderLines, ...inventoryOrderLines];

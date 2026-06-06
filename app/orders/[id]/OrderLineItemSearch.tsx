@@ -155,6 +155,18 @@ export function OrderLineItemSearch({
                       <p>
                         ${item.sellPrice} | Available {availableQuantity}
                       </p>
+                      {item.regularTireDisposal || item.semiTireDisposal ? (
+                        <p>
+                          {[
+                            item.regularTireDisposal
+                              ? "Regular disposal $3"
+                              : null,
+                            item.semiTireDisposal ? "Semi disposal $6" : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" | ")}
+                        </p>
+                      ) : null}
                       <p>{inventorySubtitle(item) || "No additional details"}</p>
                     </div>
                     <form

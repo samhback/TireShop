@@ -71,6 +71,8 @@ export default async function QuickInvoicePage({
     tireSize: item.tireSize,
     quantity: item.quantity,
     sellPrice: item.sellPrice.toString(),
+    regularTireDisposal: item.regularTireDisposal,
+    semiTireDisposal: item.semiTireDisposal,
   }));
 
   return (
