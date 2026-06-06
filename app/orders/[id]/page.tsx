@@ -9,6 +9,7 @@ import {
   createVehicleForOrder,
   rejectQuote,
   removeOrderLineItem,
+  updateOrderCustomerNotes,
   updateOrderLineItemAdjustment,
 } from "@/app/actions";
 import { prisma } from "@/lib/prisma";
@@ -36,6 +37,7 @@ type OrderDetailPageProps = {
     quoteRejected?: string;
     quotedByUpdated?: string;
     companyUpdated?: string;
+    customerNotesUpdated?: string;
     orderCanceled?: string;
     vehicleRequired?: string;
     error?: string;
@@ -132,6 +134,7 @@ export default async function OrderDetailPage({
 
   const query = await searchParams;
   const hasQuotedBy = Boolean(order.quotedByEmployeeId);
+  const isOrderLocked = ["completed", "canceled"].includes(order.status);
   const employees = await prisma.employeeProfile.findMany({
     orderBy: {
       name: "asc",
@@ -235,6 +238,10 @@ export default async function OrderDetailPage({
           <p className="success">Company car pricing updated.</p>
         ) : null}
 
+        {query?.customerNotesUpdated === "1" ? (
+          <p className="success">Customer notes updated.</p>
+        ) : null}
+
         {query?.error === "vehicle" ? (
           <p className="error">Choose or enter a valid vehicle for this order.</p>
         ) : null}
@@ -275,6 +282,10 @@ export default async function OrderDetailPage({
           <p className="error">Choose a valid company before applying company car pricing.</p>
         ) : null}
 
+        {query?.error === "customerNotes" ? (
+          <p className="error">Unable to save customer notes for this order.</p>
+        ) : null}
+
         {query?.error === "performedByRequired" ? (
           <p className="error">Every service line needs a Performed By employee before completing the order.</p>
         ) : null}
@@ -303,7 +314,7 @@ export default async function OrderDetailPage({
                 canApply={canApplyCompanyPricing}
                 companyId={companyForOrder?.id ?? null}
                 companyName={companyForOrder?.name ?? "No company assigned"}
-                disabled={["completed", "canceled"].includes(order.status)}
+                disabled={isOrderLocked}
                 isCompanyCar={order.isCompanyCar}
                 orderId={order.id}
               />
@@ -437,6 +448,34 @@ export default async function OrderDetailPage({
             )}
           </article>
         </div>
+
+        <form
+          action={updateOrderCustomerNotes}
+          className="customer-form"
+          data-preserve-scroll="true"
+        >
+          <input name="orderId" type="hidden" value={order.id} />
+          <div className="form-section">
+            <h2>Customer Notes</h2>
+            <div className="field">
+              <label htmlFor="customerNotes">Quote Notes</label>
+              <textarea
+                defaultValue={order.notes ?? ""}
+                disabled={isOrderLocked}
+                id="customerNotes"
+                name="customerNotes"
+                placeholder="Customer says rattling noise in the engine area."
+              />
+            </div>
+            <button
+              className="secondary-button"
+              disabled={isOrderLocked}
+              type="submit"
+            >
+              Save Notes
+            </button>
+          </div>
+        </form>
 
         <div className="form-section compact-expandable-panel">
           <h2>Existing Vehicles</h2>

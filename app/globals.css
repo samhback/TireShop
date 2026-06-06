@@ -1684,6 +1684,25 @@ h1 {
   margin: 4px 0;
 }
 
+.quote-notes {
+  background: #fffdf7;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-top: 24px;
+  padding: 16px 18px;
+}
+
+.quote-notes h2 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+
+.quote-notes p {
+  color: #2f3833;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
 .quote-table {
   width: 100%;
   border-collapse: collapse;

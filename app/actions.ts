@@ -1427,6 +1427,46 @@ export async function updateOrderQuotedBy(formData: FormData) {
   redirect(`/orders/${orderId}?quotedByUpdated=1`);
 }
 
+export async function updateOrderCustomerNotes(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const orderId = Number(formData.get("orderId"));
+  const customerNotes = String(formData.get("customerNotes") ?? "").trim();
+
+  if (!Number.isInteger(orderId)) {
+    redirect(`/orders/${orderId || ""}?error=customerNotes`);
+  }
+
+  const order = await prisma.order.findUnique({
+    where: {
+      id: orderId,
+    },
+    select: {
+      id: true,
+      status: true,
+    },
+  });
+
+  if (!order || ["completed", "canceled"].includes(order.status)) {
+    redirect(`/orders/${orderId}?error=customerNotes`);
+  }
+
+  await prisma.order.update({
+    where: {
+      id: orderId,
+    },
+    data: {
+      notes: customerNotes || null,
+    },
+  });
+
+  redirect(`/orders/${orderId}?customerNotesUpdated=1`);
+}
+
 export async function updateOrderCompanyCar(formData: FormData) {
   const employee = await getEmployeeSession();
 

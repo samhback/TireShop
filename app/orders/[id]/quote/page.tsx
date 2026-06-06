@@ -129,6 +129,13 @@ export default async function QuotePage({ params }: QuotePageProps) {
           </section>
         </div>
 
+        {order.notes ? (
+          <section className="quote-notes">
+            <h2>Customer Notes</h2>
+            <p>{order.notes}</p>
+          </section>
+        ) : null}
+
         <table className="quote-table">
           <thead>
             <tr>
