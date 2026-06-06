@@ -442,6 +442,22 @@ async function orderHasVehicle(orderId: number) {
   return Boolean(order?.vehicleId);
 }
 
+function inventorySellPriceFromFormData(formData: FormData, cost: number) {
+  const pricingMode = String(formData.get("pricingMode") ?? "sale");
+
+  if (pricingMode === "markup") {
+    const markupPercent = Number(formData.get("markupPercent"));
+
+    if (Number.isNaN(markupPercent) || markupPercent < 0) {
+      return Number.NaN;
+    }
+
+    return Number((cost * (1 + markupPercent / 100)).toFixed(2));
+  }
+
+  return Number(formData.get("sellPrice"));
+}
+
 export async function createInventoryItem(formData: FormData) {
   const employee = await getEmployeeSession();
 
@@ -454,7 +470,7 @@ export async function createInventoryItem(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const quantity = Number(formData.get("quantity"));
   const cost = Number(formData.get("cost"));
-  const sellPrice = Number(formData.get("sellPrice"));
+  const sellPrice = inventorySellPriceFromFormData(formData, cost);
   const lowStockThreshold = Number(formData.get("lowStockThreshold") || 0);
   const salesCategory = validSalesCategory(
     String(formData.get("salesCategory") ?? ""),
@@ -531,7 +547,7 @@ export async function updateInventoryItem(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const quantity = Number(formData.get("quantity"));
   const cost = Number(formData.get("cost"));
-  const sellPrice = Number(formData.get("sellPrice"));
+  const sellPrice = inventorySellPriceFromFormData(formData, cost);
   const lowStockThreshold = Number(formData.get("lowStockThreshold") || 0);
   const salesCategory = validSalesCategory(
     String(formData.get("salesCategory") ?? ""),

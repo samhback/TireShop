@@ -8,6 +8,7 @@ import {
   salesCategoryOptions,
 } from "@/lib/salesCategories";
 import { getEmployeeSession } from "@/lib/session";
+import { InventoryPricingFields } from "../../InventoryPricingFields";
 import { TireSmartFill } from "./TireSmartFill";
 
 type AddInventoryCategoryPageProps = {
@@ -90,29 +91,7 @@ export default async function AddInventoryCategoryPage({
                 />
               </div>
 
-              <div className="field">
-                <label htmlFor="cost">Cost Each</label>
-                <input
-                  id="cost"
-                  min="0"
-                  name="cost"
-                  step="0.01"
-                  type="number"
-                  required
-                />
-              </div>
-
-              <div className="field">
-                <label htmlFor="sellPrice">Sell Price Each</label>
-                <input
-                  id="sellPrice"
-                  min="0"
-                  name="sellPrice"
-                  step="0.01"
-                  type="number"
-                  required
-                />
-              </div>
+              <InventoryPricingFields />
 
               <div className="field">
                 <label htmlFor="lowStockThreshold">Low Stock Threshold</label>

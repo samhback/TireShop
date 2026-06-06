@@ -5,6 +5,7 @@ import { getInventoryCategory } from "@/lib/inventoryCategories";
 import { prisma } from "@/lib/prisma";
 import { salesCategoryOptions } from "@/lib/salesCategories";
 import { getEmployeeSession } from "@/lib/session";
+import { InventoryPricingFields } from "../../InventoryPricingFields";
 
 type EditInventoryPageProps = {
   params: Promise<{
@@ -130,31 +131,10 @@ export default async function EditInventoryPage({
                 />
               </div>
 
-              <div className="field">
-                <label htmlFor="cost">Cost Each</label>
-                <input
-                  defaultValue={item.cost.toString()}
-                  id="cost"
-                  min="0"
-                  name="cost"
-                  step="0.01"
-                  type="number"
-                  required
-                />
-              </div>
-
-              <div className="field">
-                <label htmlFor="sellPrice">Sell Price Each</label>
-                <input
-                  defaultValue={item.sellPrice.toString()}
-                  id="sellPrice"
-                  min="0"
-                  name="sellPrice"
-                  step="0.01"
-                  type="number"
-                  required
-                />
-              </div>
+              <InventoryPricingFields
+                defaultCost={item.cost.toString()}
+                defaultSellPrice={item.sellPrice.toString()}
+              />
 
               <div className="field">
                 <label htmlFor="lowStockThreshold">Low Stock Threshold</label>
