@@ -107,6 +107,12 @@ export default async function InvoicePrintPage({ params }: InvoicePrintPageProps
             ) : null}
             <span>Order</span>
             <strong>{invoice.order.orderNumber}</strong>
+            {invoice.order.isCompanyCar && invoice.order.companyNameSnapshot ? (
+              <>
+                <span>Company</span>
+                <strong>{invoice.order.companyNameSnapshot}</strong>
+              </>
+            ) : null}
           </div>
         </header>
 

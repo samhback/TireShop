@@ -13,6 +13,7 @@ type ServiceResult = Awaited<ReturnType<typeof searchServices>>[number];
 type InventoryResult = Awaited<ReturnType<typeof searchInventory>>[number];
 
 type OrderLineItemSearchProps = {
+  companyMarkupPercent: string | null;
   orderId: number;
   reservedInventoryQuantities: Record<number, number>;
 };
@@ -35,6 +36,7 @@ function inventorySubtitle(item: InventoryResult) {
 }
 
 export function OrderLineItemSearch({
+  companyMarkupPercent,
   orderId,
   reservedInventoryQuantities,
 }: OrderLineItemSearchProps) {
@@ -43,6 +45,16 @@ export function OrderLineItemSearch({
   const [inventoryQuery, setInventoryQuery] = useState("");
   const [inventoryResults, setInventoryResults] = useState<InventoryResult[]>([]);
   const [isPending, startTransition] = useTransition();
+  const markupPercent =
+    companyMarkupPercent === null ? null : Number(companyMarkupPercent);
+
+  function inventoryPrice(item: InventoryResult) {
+    if (markupPercent === null || Number.isNaN(markupPercent)) {
+      return Number(item.sellPrice).toFixed(2);
+    }
+
+    return (Number(item.cost) * (1 + markupPercent / 100)).toFixed(2);
+  }
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -153,7 +165,7 @@ export function OrderLineItemSearch({
                     <div>
                       <h3>{item.name}</h3>
                       <p>
-                        ${item.sellPrice} | Available {availableQuantity}
+                        ${inventoryPrice(item)} | Available {availableQuantity}
                       </p>
                       {item.regularTireDisposal || item.semiTireDisposal ? (
                         <p>

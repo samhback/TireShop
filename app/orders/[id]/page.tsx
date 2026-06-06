@@ -9,6 +9,7 @@ import {
   createVehicleForOrder,
   rejectQuote,
   removeOrderLineItem,
+  updateOrderCompanyCar,
   updateOrderLineItemAdjustment,
 } from "@/app/actions";
 import { prisma } from "@/lib/prisma";
@@ -34,6 +35,7 @@ type OrderDetailPageProps = {
     quoteAccepted?: string;
     quoteRejected?: string;
     quotedByUpdated?: string;
+    companyUpdated?: string;
     orderCanceled?: string;
     vehicleRequired?: string;
     error?: string;
@@ -134,6 +136,11 @@ export default async function OrderDetailPage({
       name: "asc",
     },
   });
+  const companies = await prisma.company.findMany({
+    orderBy: {
+      name: "asc",
+    },
+  });
   const subtotal = order.lineItems.reduce(
     (total, item) => total + Number(item.lineTotal.toString()),
     0,
@@ -221,6 +228,10 @@ export default async function OrderDetailPage({
           <p className="success">Quoted By updated.</p>
         ) : null}
 
+        {query?.companyUpdated === "1" ? (
+          <p className="success">Company car pricing updated.</p>
+        ) : null}
+
         {query?.error === "vehicle" ? (
           <p className="error">Choose or enter a valid vehicle for this order.</p>
         ) : null}
@@ -257,6 +268,10 @@ export default async function OrderDetailPage({
           <p className="error">Choose a valid employee for Performed By.</p>
         ) : null}
 
+        {query?.error === "company" ? (
+          <p className="error">Choose a valid company before applying company car pricing.</p>
+        ) : null}
+
         {query?.error === "performedByRequired" ? (
           <p className="error">Every service line needs a Performed By employee before completing the order.</p>
         ) : null}
@@ -278,6 +293,46 @@ export default async function OrderDetailPage({
             orderId={order.id}
             quotedByEmployeeId={order.quotedByEmployeeId}
           />
+
+          <form
+            action={updateOrderCompanyCar}
+            className="quoted-by-form"
+            data-preserve-scroll="true"
+          >
+            <input name="orderId" type="hidden" value={order.id} />
+            <div className="field quoted-by-auto-field">
+              <label htmlFor="companyId">Company</label>
+              <select
+                defaultValue={order.companyId?.toString() ?? ""}
+                disabled={["completed", "canceled"].includes(order.status)}
+                id="companyId"
+                name="companyId"
+              >
+                <option value="">No company</option>
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <label className="checkbox-line">
+              <input
+                defaultChecked={order.isCompanyCar}
+                disabled={["completed", "canceled"].includes(order.status)}
+                name="isCompanyCar"
+                type="checkbox"
+              />
+              Company Car
+            </label>
+            <button
+              className="secondary-button"
+              disabled={["completed", "canceled"].includes(order.status)}
+              type="submit"
+            >
+              Apply Company Pricing
+            </button>
+          </form>
 
           <div className="quote-status-actions">
             {order.status === "canceled" ? (
@@ -375,6 +430,12 @@ export default async function OrderDetailPage({
             <p>
               {[order.customer.phone, order.customer.email].filter(Boolean).join(" | ")}
             </p>
+            {order.isCompanyCar && order.companyNameSnapshot ? (
+              <p>
+                Company car: {order.companyNameSnapshot} (
+                {money(order.companyMarkupPercent ?? 0)}% markup)
+              </p>
+            ) : null}
           </article>
 
           <article className="order-summary-card">
@@ -571,6 +632,11 @@ export default async function OrderDetailPage({
           {order.vehicle ? (
             <>
               <OrderLineItemSearch
+                companyMarkupPercent={
+                  order.isCompanyCar
+                    ? order.companyMarkupPercent?.toString() ?? null
+                    : null
+                }
                 orderId={order.id}
                 reservedInventoryQuantities={reservedInventoryQuantities}
               />

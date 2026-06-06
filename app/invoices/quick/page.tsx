@@ -21,8 +21,13 @@ export default async function QuickInvoicePage({
 
   const params = await searchParams;
 
-  const [employees, services, inventoryItems] = await Promise.all([
+  const [employees, companies, services, inventoryItems] = await Promise.all([
     prisma.employeeProfile.findMany({
+      orderBy: {
+        name: "asc",
+      },
+    }),
+    prisma.company.findMany({
       orderBy: {
         name: "asc",
       },
@@ -50,6 +55,12 @@ export default async function QuickInvoicePage({
     name: profile.name,
   }));
 
+  const companyOptions = companies.map((company) => ({
+    id: company.id,
+    name: company.name,
+    markupPercent: company.markupPercent.toString(),
+  }));
+
   const serviceOptions = services.map((service) => ({
     id: service.id,
     category: service.category,
@@ -70,6 +81,7 @@ export default async function QuickInvoicePage({
     partNumber: item.partNumber,
     tireSize: item.tireSize,
     quantity: item.quantity,
+    cost: item.cost.toString(),
     sellPrice: item.sellPrice.toString(),
     regularTireDisposal: item.regularTireDisposal,
     semiTireDisposal: item.semiTireDisposal,
@@ -104,6 +116,7 @@ export default async function QuickInvoicePage({
         ) : null}
 
         <QuickInvoiceForm
+          companies={companyOptions}
           employees={employeeOptions}
           inventoryItems={inventoryOptions}
           services={serviceOptions}

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   Boxes,
+  Building2,
   ClipboardList,
   FileText,
   ShoppingCart,
@@ -32,6 +33,12 @@ const dashboardItems = [
     description: "Customer records, vehicles, maintenance logs, and notes.",
     href: "/customers",
     icon: Users,
+  },
+  {
+    title: "Companies",
+    description: "Company markup pricing and employee customer records.",
+    href: "/companies",
+    icon: Building2,
   },
   {
     title: "Orders",

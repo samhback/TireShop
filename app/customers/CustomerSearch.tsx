@@ -73,6 +73,7 @@ export function CustomerSearch({ defaultCustomers = [] }: CustomerSearchProps) {
                 </Link>
               </div>
               <p>{[customer.phone, customer.email].filter(Boolean).join(" | ")}</p>
+              {customer.company ? <p>Company: {customer.company.name}</p> : null}
 
               {customer.vehicles.length > 0 ? (
                 <div className="vehicle-list">

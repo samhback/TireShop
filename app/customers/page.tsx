@@ -14,6 +14,7 @@ export default async function CustomersPage() {
 
   const customers = await prisma.customer.findMany({
     include: {
+      company: true,
       vehicles: {
         include: {
           _count: {
@@ -38,6 +39,12 @@ export default async function CustomersPage() {
     lastName: customer.lastName,
     phone: customer.phone,
     email: customer.email,
+    company: customer.company
+      ? {
+          id: customer.company.id,
+          name: customer.company.name,
+        }
+      : null,
     notes: customer.notes,
     vehicles: customer.vehicles.map((vehicle) => ({
       id: vehicle.id,

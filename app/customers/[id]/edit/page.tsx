@@ -118,6 +118,11 @@ export default async function EditCustomerPage({
     notFound();
   }
 
+  const companies = await prisma.company.findMany({
+    orderBy: {
+      name: "asc",
+    },
+  });
   const query = await searchParams;
   const accountEntries = customer.accountEntries;
   const entryTotal = (entryTypes: string[]) =>
@@ -226,6 +231,22 @@ export default async function EditCustomerPage({
                   <option value="phone">Phone</option>
                   <option value="text">Text</option>
                   <option value="email">Email</option>
+                </select>
+              </div>
+
+              <div className="field">
+                <label htmlFor="companyId">Company</label>
+                <select
+                  defaultValue={customer.companyId?.toString() ?? ""}
+                  id="companyId"
+                  name="companyId"
+                >
+                  <option value="">No company</option>
+                  {companies.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>

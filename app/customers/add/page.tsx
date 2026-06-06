@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createCustomer } from "@/app/actions";
 import { UnsavedHomeLink } from "@/app/UnsavedHomeLink";
+import { prisma } from "@/lib/prisma";
 import { getEmployeeSession } from "@/lib/session";
 import { stateOptions } from "@/lib/vehicleOptions";
 import { VehicleFields } from "../VehicleFields";
@@ -9,8 +10,10 @@ import { PhoneInput } from "./PhoneInput";
 
 type AddCustomerPageProps = {
   searchParams?: Promise<{
+    companyId?: string;
     created?: string;
     error?: string;
+    returnToCompanyId?: string;
   }>;
 };
 
@@ -24,6 +27,13 @@ export default async function AddCustomerPage({
   }
 
   const params = await searchParams;
+  const companies = await prisma.company.findMany({
+    orderBy: {
+      name: "asc",
+    },
+  });
+  const selectedCompanyId = params?.companyId ?? "";
+  const returnToCompanyId = params?.returnToCompanyId ?? "";
 
   return (
     <main className="placeholder-shell">
@@ -49,6 +59,13 @@ export default async function AddCustomerPage({
         ) : null}
 
         <form className="customer-form" action={createCustomer} data-unsaved-guard>
+          {returnToCompanyId ? (
+            <input
+              name="returnToCompanyId"
+              type="hidden"
+              value={returnToCompanyId}
+            />
+          ) : null}
           <div className="form-section">
             <h2>Customer Info</h2>
             <div className="form-grid">
@@ -79,6 +96,22 @@ export default async function AddCustomerPage({
                   <option value="phone">Phone</option>
                   <option value="text">Text</option>
                   <option value="email">Email</option>
+                </select>
+              </div>
+
+              <div className="field">
+                <label htmlFor="companyId">Company</label>
+                <select
+                  defaultValue={selectedCompanyId}
+                  id="companyId"
+                  name="companyId"
+                >
+                  <option value="">No company</option>
+                  {companies.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>

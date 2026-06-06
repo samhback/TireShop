@@ -9,6 +9,12 @@ type EmployeeOption = {
   name: string;
 };
 
+type CompanyOption = {
+  id: number;
+  name: string;
+  markupPercent: string;
+};
+
 type ServiceOption = {
   id: number;
   category: string;
@@ -29,6 +35,7 @@ type InventoryOption = {
   partNumber: string | null;
   tireSize: string | null;
   quantity: number;
+  cost: string;
   sellPrice: string;
   regularTireDisposal: boolean;
   semiTireDisposal: boolean;
@@ -40,6 +47,7 @@ type QuickLine = {
 };
 
 type QuickInvoiceFormProps = {
+  companies: CompanyOption[];
   employees: EmployeeOption[];
   services: ServiceOption[];
   inventoryItems: InventoryOption[];
@@ -76,6 +84,7 @@ function money(value: number) {
 }
 
 export function QuickInvoiceForm({
+  companies,
   employees,
   services,
   inventoryItems,
@@ -88,6 +97,8 @@ export function QuickInvoiceForm({
   );
   const [serviceLines, setServiceLines] = useState<QuickLine[]>([]);
   const [inventoryLines, setInventoryLines] = useState<QuickLine[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState("");
+  const [isCompanyCar, setIsCompanyCar] = useState(false);
 
   const serviceMap = useMemo(
     () => new Map(services.map((service) => [service.id, service])),
@@ -97,6 +108,26 @@ export function QuickInvoiceForm({
     () => new Map(inventoryItems.map((item) => [item.id, item])),
     [inventoryItems],
   );
+  const companyMap = useMemo(
+    () => new Map(companies.map((company) => [company.id, company])),
+    [companies],
+  );
+  const selectedCompany = selectedCompanyId
+    ? companyMap.get(Number(selectedCompanyId))
+    : null;
+
+  function inventoryUnitPrice(item: InventoryOption) {
+    if (!isCompanyCar || !selectedCompany) {
+      return Number(item.sellPrice);
+    }
+
+    return Number(
+      (
+        Number(item.cost) *
+        (1 + Number(selectedCompany.markupPercent) / 100)
+      ).toFixed(2),
+    );
+  }
 
   function addService() {
     const serviceId = Number(selectedServiceId);
@@ -175,7 +206,7 @@ export function QuickInvoiceForm({
         (item?.regularTireDisposal ? 3 : 0) +
         (item?.semiTireDisposal ? 6 : 0);
 
-      return line.quantity * (Number(item?.sellPrice ?? 0) + disposalFee);
+      return line.quantity * ((item ? inventoryUnitPrice(item) : 0) + disposalFee);
     }),
   ].reduce((sum, value) => sum + value, 0);
 
@@ -211,6 +242,32 @@ export function QuickInvoiceForm({
                 </option>
               ))}
             </select>
+          </label>
+
+          <label>
+            Company
+            <select
+              name="companyId"
+              onChange={(event) => setSelectedCompanyId(event.target.value)}
+              value={selectedCompanyId}
+            >
+              <option value="">No company</option>
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="checkbox-line">
+            <input
+              checked={isCompanyCar}
+              name="isCompanyCar"
+              onChange={(event) => setIsCompanyCar(event.target.checked)}
+              type="checkbox"
+            />
+            Company Car
           </label>
         </div>
       </div>
@@ -320,7 +377,7 @@ export function QuickInvoiceForm({
                     <div>
                       <h3>{item.name}</h3>
                       <p>
-                        ${item.sellPrice} | Available {item.quantity}
+                        ${money(inventoryUnitPrice(item))} | Available {item.quantity}
                       </p>
                       {item.regularTireDisposal || item.semiTireDisposal ? (
                         <p>
@@ -374,7 +431,10 @@ export function QuickInvoiceForm({
 
       <button
         className="submit-button compact-submit-button"
-        disabled={serviceLines.length === 0 && inventoryLines.length === 0}
+        disabled={
+          (serviceLines.length === 0 && inventoryLines.length === 0) ||
+          (isCompanyCar && !selectedCompany)
+        }
         type="submit"
       >
         <span>Create Invoice</span>
