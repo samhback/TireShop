@@ -58,6 +58,7 @@ export default async function QuickInvoicePage({
   const companyOptions = companies.map((company) => ({
     id: company.id,
     name: company.name,
+    useCompanyMarkup: company.useCompanyMarkup,
     markupPercent: company.markupPercent.toString(),
   }));
 

@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { updateCompany } from "@/app/actions";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSession } from "@/lib/session";
+import { CompanyMarkupFields } from "../../CompanyMarkupFields";
 
 type EditCompanyPageProps = {
   params: Promise<{
@@ -56,11 +57,13 @@ export default async function EditCompanyPage({
         <p className="eyebrow">Companies</p>
         <h1>Edit {company.name}</h1>
         <p className="helper">
-          Update company-specific inventory markup and notes.
+          Optionally update company-specific inventory markup and notes.
         </p>
 
         {paramsValue?.error === "invalid" ? (
-          <p className="error">Enter a company name and valid markup percent.</p>
+          <p className="error">
+            Enter a company name and, when enabled, a valid markup percent.
+          </p>
         ) : null}
 
         <form className="customer-form" action={updateCompany}>
@@ -78,18 +81,10 @@ export default async function EditCompanyPage({
                 />
               </div>
 
-              <div className="field">
-                <label htmlFor="markupPercent">Inventory Markup %</label>
-                <input
-                  defaultValue={company.markupPercent.toString()}
-                  id="markupPercent"
-                  min="0"
-                  name="markupPercent"
-                  step="0.01"
-                  type="number"
-                  required
-                />
-              </div>
+              <CompanyMarkupFields
+                defaultEnabled={company.useCompanyMarkup}
+                defaultMarkupPercent={company.markupPercent.toString()}
+              />
 
               <div className="field form-grid-wide">
                 <label htmlFor="notes">Notes</label>

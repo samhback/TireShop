@@ -102,14 +102,15 @@ model ServiceItem {
 }
 
 model Company {
-  id            Int        @id @default(autoincrement())
-  name          String
-  markupPercent Decimal    @default(0) @map("markup_percent") @db.Decimal(5, 2)
-  notes         String?
-  customers     Customer[]
-  orders        Order[]
-  createdAt     DateTime   @default(now()) @map("created_at")
-  updatedAt     DateTime   @updatedAt @map("updated_at")
+  id               Int        @id @default(autoincrement())
+  name             String
+  useCompanyMarkup Boolean    @default(false) @map("use_company_markup")
+  markupPercent    Decimal    @default(0) @map("markup_percent") @db.Decimal(5, 2)
+  notes            String?
+  customers        Customer[]
+  orders           Order[]
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
 
   @@index([name])
   @@map("companies")

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createCompany } from "@/app/actions";
 import { getEmployeeSession } from "@/lib/session";
+import { CompanyMarkupFields } from "../CompanyMarkupFields";
 
 type AddCompanyPageProps = {
   searchParams?: Promise<{
@@ -34,11 +35,14 @@ export default async function AddCompanyPage({
         <p className="eyebrow">Companies</p>
         <h1>Add Company</h1>
         <p className="helper">
-          Set company-specific inventory markup for company-car orders.
+          Optionally set company-specific inventory markup for company-car
+          orders.
         </p>
 
         {params?.error === "invalid" ? (
-          <p className="error">Enter a company name and valid markup percent.</p>
+          <p className="error">
+            Enter a company name and, when enabled, a valid markup percent.
+          </p>
         ) : null}
 
         <form className="customer-form" action={createCompany}>
@@ -50,18 +54,7 @@ export default async function AddCompanyPage({
                 <input id="name" name="name" required />
               </div>
 
-              <div className="field">
-                <label htmlFor="markupPercent">Inventory Markup %</label>
-                <input
-                  defaultValue="0"
-                  id="markupPercent"
-                  min="0"
-                  name="markupPercent"
-                  step="0.01"
-                  type="number"
-                  required
-                />
-              </div>
+              <CompanyMarkupFields />
 
               <div className="field form-grid-wide">
                 <label htmlFor="notes">Notes</label>

@@ -135,7 +135,10 @@ export default async function CompanyPage({
             <p className="eyebrow">Company</p>
             <h1>{company.name}</h1>
             <p className="helper">
-              Inventory markup: {moneyPercent(company.markupPercent)}%
+              Inventory markup:{" "}
+              {company.useCompanyMarkup
+                ? `${moneyPercent(company.markupPercent)}%`
+                : "Default pricing"}
             </p>
           </div>
           <Link className="secondary-link-button" href={`/companies/${company.id}/edit`}>

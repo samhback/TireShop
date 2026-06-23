@@ -76,7 +76,12 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
                       {company._count.customers === 1 ? "" : "s"}
                     </span>
                     <h2>{company.name}</h2>
-                    <p>Inventory markup: {moneyPercent(company.markupPercent)}%</p>
+                    <p>
+                      Inventory markup:{" "}
+                      {company.useCompanyMarkup
+                        ? `${moneyPercent(company.markupPercent)}%`
+                        : "Default pricing"}
+                    </p>
                     {company.notes ? <p>{company.notes}</p> : null}
                     <Link
                       className="secondary-link-button inline-action-link"

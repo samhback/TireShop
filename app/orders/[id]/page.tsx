@@ -420,7 +420,10 @@ export default async function OrderDetailPage({
             {order.isCompanyCar && order.companyNameSnapshot ? (
               <p>
                 Company car: {order.companyNameSnapshot} (
-                {money(order.companyMarkupPercent ?? 0)}% markup)
+                {order.companyMarkupPercent === null
+                  ? "standard pricing"
+                  : `${money(order.companyMarkupPercent)}% markup`}
+                )
               </p>
             ) : null}
           </article>

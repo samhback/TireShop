@@ -143,7 +143,10 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
             {invoice.order.isCompanyCar && invoice.order.companyNameSnapshot ? (
               <p>
                 Company car: {invoice.order.companyNameSnapshot} (
-                {money(invoice.order.companyMarkupPercent ?? 0)}% markup)
+                {invoice.order.companyMarkupPercent === null
+                  ? "standard pricing"
+                  : `${money(invoice.order.companyMarkupPercent)}% markup`}
+                )
               </p>
             ) : null}
           </article>

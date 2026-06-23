@@ -12,6 +12,7 @@ type EmployeeOption = {
 type CompanyOption = {
   id: number;
   name: string;
+  useCompanyMarkup: boolean;
   markupPercent: string;
 };
 
@@ -117,7 +118,11 @@ export function QuickInvoiceForm({
     : null;
 
   function inventoryUnitPrice(item: InventoryOption) {
-    if (!isCompanyCar || !selectedCompany) {
+    if (
+      !isCompanyCar ||
+      !selectedCompany ||
+      !selectedCompany.useCompanyMarkup
+    ) {
       return Number(item.sellPrice);
     }
 

@@ -232,15 +232,22 @@ export async function createCompany(formData: FormData) {
   }
 
   const name = String(formData.get("name") ?? "").trim();
-  const markupPercent = Number(formData.get("markupPercent"));
+  const useCompanyMarkup = formData.get("useCompanyMarkup") === "on";
+  const markupPercent = useCompanyMarkup
+    ? Number(formData.get("markupPercent"))
+    : 0;
 
-  if (!name || Number.isNaN(markupPercent) || markupPercent < 0) {
+  if (
+    !name ||
+    (useCompanyMarkup && (Number.isNaN(markupPercent) || markupPercent < 0))
+  ) {
     redirect("/companies/add?error=invalid");
   }
 
   const company = await prisma.company.create({
     data: {
       name,
+      useCompanyMarkup,
       markupPercent,
       notes: nullableValue(formData, "notes"),
     },
@@ -258,13 +265,18 @@ export async function updateCompany(formData: FormData) {
 
   const companyId = Number(formData.get("companyId"));
   const name = String(formData.get("name") ?? "").trim();
-  const markupPercent = Number(formData.get("markupPercent"));
+  const useCompanyMarkup = formData.get("useCompanyMarkup") === "on";
+  const markupPercent = useCompanyMarkup
+    ? Number(formData.get("markupPercent"))
+    : null;
 
   if (
     !Number.isInteger(companyId) ||
     !name ||
-    Number.isNaN(markupPercent) ||
-    markupPercent < 0
+    (useCompanyMarkup &&
+      (markupPercent === null ||
+        Number.isNaN(markupPercent) ||
+        markupPercent < 0))
   ) {
     redirect(`/companies/${companyId || ""}/edit?error=invalid`);
   }
@@ -275,7 +287,8 @@ export async function updateCompany(formData: FormData) {
     },
     data: {
       name,
-      markupPercent,
+      useCompanyMarkup,
+      ...(markupPercent === null ? {} : { markupPercent }),
       notes: nullableValue(formData, "notes"),
     },
   });
@@ -1521,7 +1534,10 @@ export async function updateOrderCompanyCar(formData: FormData) {
       isCompanyCar,
       companyId: isCompanyCar ? company!.id : null,
       companyNameSnapshot: isCompanyCar ? company!.name : null,
-      companyMarkupPercent: isCompanyCar ? company!.markupPercent : null,
+      companyMarkupPercent:
+        isCompanyCar && company!.useCompanyMarkup
+          ? company!.markupPercent
+          : null,
     },
   });
 
@@ -2450,7 +2466,7 @@ export async function createQuickInvoice(formData: FormData) {
       (inventoryItem) => inventoryItem.id === line.id,
     )!;
     const unitPrice =
-      isCompanyCar && company
+      isCompanyCar && company?.useCompanyMarkup
         ? companyInventoryUnitPrice(item, company.markupPercent)
         : Number(item.sellPrice.toString());
 
@@ -2515,7 +2531,9 @@ export async function createQuickInvoice(formData: FormData) {
         isCompanyCar,
         companyNameSnapshot: isCompanyCar && company ? company.name : null,
         companyMarkupPercent:
-          isCompanyCar && company ? company.markupPercent : null,
+          isCompanyCar && company?.useCompanyMarkup
+            ? company.markupPercent
+            : null,
         createdBy: employee,
         quotedByEmployeeId,
         quoteAcceptedAt: new Date(),
