@@ -82,6 +82,12 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
                         ? `${moneyPercent(company.markupPercent)}%`
                         : "Default pricing"}
                     </p>
+                    {company.email ? <p>Email: {company.email}</p> : null}
+                    {company.billingAddress ? (
+                      <p style={{ whiteSpace: "pre-line" }}>
+                        Billing Address: {company.billingAddress}
+                      </p>
+                    ) : null}
                     {company.notes ? <p>{company.notes}</p> : null}
                     <Link
                       className="secondary-link-button inline-action-link"
