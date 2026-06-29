@@ -1678,6 +1678,12 @@ h1 {
   margin: 8px 0 0;
 }
 
+.shop-address {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .quote-meta {
   display: grid;
   gap: 6px;

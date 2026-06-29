@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSession } from "@/lib/session";
+import { formatTaxRatePercent } from "@/lib/tax";
 import { PrintButton } from "./PrintButton";
 
 type InvoicePrintPageProps = {
@@ -86,6 +87,9 @@ export default async function InvoicePrintPage({ params }: InvoicePrintPageProps
         <header className="quote-header">
           <div>
             <p className="eyebrow">Healdton Service Center</p>
+            <p className="shop-address">
+              <strong>Billing Address:</strong> 10202 SH-76, Healdton, Oklahoma
+            </p>
             <h1>Invoice</h1>
             <p>{invoice.invoiceNumber}</p>
           </div>
@@ -181,7 +185,7 @@ export default async function InvoicePrintPage({ params }: InvoicePrintPageProps
           <strong>${money(invoice.subtotal)}</strong>
         </div>
         <div className="quote-total quote-total-secondary">
-          <span>Tax</span>
+          <span>Sales Tax ({formatTaxRatePercent(invoice.taxRate)}%)</span>
           <strong>${money(invoice.taxAmount)}</strong>
         </div>
         <div className="quote-total">

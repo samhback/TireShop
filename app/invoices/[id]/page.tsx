@@ -4,6 +4,7 @@ import { deleteInvoice, markInvoicePaid } from "@/app/actions";
 import { DeleteButton } from "@/app/DeleteButton";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSession } from "@/lib/session";
+import { formatTaxRatePercent } from "@/lib/tax";
 
 type InvoicePageProps = {
   params: Promise<{
@@ -258,7 +259,10 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
             <div className="order-total-row">
               <div className="invoice-total-stack">
                 <span>Subtotal: ${money(invoice.subtotal)}</span>
-                <span>Tax: ${money(invoice.taxAmount)}</span>
+                <span>
+                  Sales Tax ({formatTaxRatePercent(invoice.taxRate)}%): $
+                  {money(invoice.taxAmount)}
+                </span>
                 <strong>Total: ${money(invoice.total)}</strong>
               </div>
             </div>

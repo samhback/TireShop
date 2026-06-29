@@ -11,6 +11,12 @@ import {
 import { getInventoryCategory } from "@/lib/inventoryCategories";
 import { defaultInventorySalesCategory, salesCategoryOptions } from "@/lib/salesCategories";
 import { normalizeUsername } from "@/lib/usernames";
+import {
+  REGULAR_TIRE_DISPOSAL_DESCRIPTION,
+  SEMI_TIRE_DISPOSAL_DESCRIPTION,
+  getSalesTaxRate,
+  isTireDisposalLine,
+} from "@/lib/tax";
 
 async function currentEmployeeIsAdmin() {
   const currentEmployee = await getEmployeeSession();
@@ -375,8 +381,7 @@ function orderLineTotal(
 }
 
 function currentTaxRate() {
-  const configuredRate = Number(process.env.SALES_TAX_RATE ?? "0");
-  return Number.isNaN(configuredRate) || configuredRate < 0 ? 0 : configuredRate;
+  return getSalesTaxRate();
 }
 
 function calculateInvoiceTotals(
@@ -408,15 +413,6 @@ function calculateInvoiceTotals(
 
 const REGULAR_TIRE_DISPOSAL_FEE = 3;
 const SEMI_TIRE_DISPOSAL_FEE = 6;
-const REGULAR_TIRE_DISPOSAL_DESCRIPTION = "Regular Tire Disposal";
-const SEMI_TIRE_DISPOSAL_DESCRIPTION = "Semi Tire Disposal";
-
-function isTireDisposalLine(description: string) {
-  return (
-    description === REGULAR_TIRE_DISPOSAL_DESCRIPTION ||
-    description === SEMI_TIRE_DISPOSAL_DESCRIPTION
-  );
-}
 
 function tireDisposalLines(
   item: {

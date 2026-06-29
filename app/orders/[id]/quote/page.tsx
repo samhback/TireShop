@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSession } from "@/lib/session";
+import { formatTaxRatePercent, getSalesTaxRate, lineItemTaxable } from "@/lib/tax";
 import { PrintButton } from "./PrintButton";
 
 type QuotePageProps = {
@@ -56,6 +57,18 @@ export default async function QuotePage({ params }: QuotePageProps) {
       vehicle: true,
       quotedByEmployee: true,
       lineItems: {
+        include: {
+          serviceItem: {
+            select: {
+              taxable: true,
+            },
+          },
+          inventoryItem: {
+            select: {
+              taxable: true,
+            },
+          },
+        },
         orderBy: {
           createdAt: "asc",
         },
@@ -75,6 +88,14 @@ export default async function QuotePage({ params }: QuotePageProps) {
     (total, item) => total + Number(item.lineTotal.toString()),
     0,
   );
+  const taxableSubtotal = order.lineItems.reduce(
+    (total, item) =>
+      total + (lineItemTaxable(item) ? Number(item.lineTotal.toString()) : 0),
+    0,
+  );
+  const taxRate = getSalesTaxRate();
+  const taxAmount = Number((taxableSubtotal * taxRate).toFixed(2));
+  const total = Number((subtotal + taxAmount).toFixed(2));
   const generatedAt = new Intl.DateTimeFormat("en-US", {
     dateStyle: "long",
     timeStyle: "short",
@@ -171,6 +192,14 @@ export default async function QuotePage({ params }: QuotePageProps) {
         <div className="quote-total">
           <span>Subtotal</span>
           <strong>${money(subtotal)}</strong>
+        </div>
+        <div className="quote-total quote-total-secondary">
+          <span>Sales Tax ({formatTaxRatePercent(taxRate)}%)</span>
+          <strong>${money(taxAmount)}</strong>
+        </div>
+        <div className="quote-total">
+          <span>Total</span>
+          <strong>${money(total)}</strong>
         </div>
 
         <footer className="quote-footer">
