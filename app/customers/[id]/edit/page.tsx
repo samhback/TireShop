@@ -3,8 +3,10 @@ import { notFound, redirect } from "next/navigation";
 import {
   addCustomerVehicle,
   createCustomerAccountEntry,
+  deleteCustomer,
   updateCustomer,
 } from "@/app/actions";
+import { DeleteButton } from "@/app/DeleteButton";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSession } from "@/lib/session";
 import { stateOptions } from "@/lib/vehicleOptions";
@@ -177,6 +179,17 @@ export default async function EditCustomerPage({
 
         {query?.error === "account" ? (
           <p className="error">Check the account entry amount.</p>
+        ) : null}
+
+        {query?.error === "history" ? (
+          <p className="error">
+            This customer has orders, invoices, or payments. Delete their
+            invoices first, then delete the customer.
+          </p>
+        ) : null}
+
+        {query?.error === "delete" ? (
+          <p className="error">Unable to delete this customer.</p>
         ) : null}
 
         <form className="customer-form" action={updateCustomer}>
@@ -457,6 +470,26 @@ export default async function EditCustomerPage({
             </span>
           </button>
         </form>
+
+        <div className="form-section">
+          <div className="section-heading-row">
+            <div>
+              <h2>Delete Customer</h2>
+              <p className="helper">
+                Permanently removes this customer along with their vehicles and
+                account activity. Customers with orders, invoices, or payments
+                must have those invoices deleted first. This cannot be undone.
+              </p>
+            </div>
+            <DeleteButton
+              action={deleteCustomer}
+              fieldName="customerId"
+              fieldValue={customer.id}
+              label="Delete Customer"
+              confirmMessage={`Delete ${customer.firstName} ${customer.lastName}? This removes the customer, their vehicles, and account activity, and cannot be undone.`}
+            />
+          </div>
+        </div>
       </section>
     </main>
   );

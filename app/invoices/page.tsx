@@ -5,12 +5,20 @@ import { prisma } from "@/lib/prisma";
 import { getEmployeeSession } from "@/lib/session";
 import { InvoiceList } from "./InvoiceList";
 
-export default async function InvoicesPage() {
+type InvoicesPageProps = {
+  searchParams?: Promise<{
+    deleted?: string;
+  }>;
+};
+
+export default async function InvoicesPage({ searchParams }: InvoicesPageProps) {
   const employee = await getEmployeeSession();
 
   if (!employee) {
     redirect("/");
   }
+
+  const query = await searchParams;
 
   const invoices = await prisma.invoice.findMany({
     include: {
@@ -61,6 +69,10 @@ export default async function InvoicesPage() {
         <p className="helper">
           Search completed order invoices by customer, vehicle, invoice number, or order number.
         </p>
+
+        {query?.deleted === "1" ? (
+          <p className="success">Invoice deleted.</p>
+        ) : null}
 
         <div className="section-grid section-grid-single">
           <Link className="section-card" href="/invoices/quick">

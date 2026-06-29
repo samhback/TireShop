@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { markInvoicePaid } from "@/app/actions";
+import { deleteInvoice, markInvoicePaid } from "@/app/actions";
+import { DeleteButton } from "@/app/DeleteButton";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSession } from "@/lib/session";
 
@@ -132,6 +133,9 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
         {paramsValue?.error === "payment" ? (
           <p className="error">Unable to update invoice payment status.</p>
         ) : null}
+        {paramsValue?.error === "delete" ? (
+          <p className="error">Unable to delete this invoice.</p>
+        ) : null}
 
         <div className="order-summary-grid">
           <article className="order-summary-card">
@@ -258,6 +262,26 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
                 <strong>Total: ${money(invoice.total)}</strong>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="form-section">
+          <div className="section-heading-row">
+            <div>
+              <h2>Delete Invoice</h2>
+              <p className="helper">
+                Permanently removes this invoice and its order, returns any sold
+                inventory to stock, and clears it from all reports. This cannot
+                be undone.
+              </p>
+            </div>
+            <DeleteButton
+              action={deleteInvoice}
+              fieldName="invoiceId"
+              fieldValue={invoice.id}
+              label="Delete Invoice"
+              confirmMessage={`Delete invoice ${invoice.invoiceNumber}? This removes the invoice and its order, restocks inventory, and cannot be undone.`}
+            />
           </div>
         </div>
       </section>

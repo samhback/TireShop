@@ -2830,3 +2830,138 @@ export async function addCustomerVehicle(formData: FormData) {
 
   redirect(`/customers/${customerId}/edit?vehicleAdded=1`);
 }
+
+export async function deleteInvoice(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const invoiceId = Number(formData.get("invoiceId"));
+
+  if (!Number.isInteger(invoiceId)) {
+    redirect(`/invoices/${invoiceId || ""}?error=delete`);
+  }
+
+  const invoice = await prisma.invoice.findUnique({
+    where: {
+      id: invoiceId,
+    },
+    select: {
+      id: true,
+      orderId: true,
+      lineItems: {
+        where: {
+          lineType: "inventory",
+        },
+        select: {
+          inventoryItemId: true,
+          quantity: true,
+        },
+      },
+    },
+  });
+
+  if (!invoice) {
+    redirect(`/invoices/${invoiceId}?error=delete`);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // Return the sold inventory to stock so the cleared invoice does not leave
+    // the on-hand count short.
+    for (const lineItem of invoice.lineItems) {
+      if (lineItem.inventoryItemId) {
+        await tx.inventoryItem.update({
+          where: {
+            id: lineItem.inventoryItemId,
+          },
+          data: {
+            quantity: {
+              increment: Number(lineItem.quantity.toString()),
+            },
+          },
+        });
+      }
+    }
+
+    // Remove ledger entries tied to this invoice so they stop showing on
+    // reports. Deleting the invoice alone would only null their reference and
+    // leave them counted in the receipts summary.
+    await tx.customerAccountEntry.deleteMany({
+      where: {
+        invoiceId: invoice.id,
+      },
+    });
+
+    // Cascades remove the invoice line items and payments.
+    await tx.invoice.delete({
+      where: {
+        id: invoice.id,
+      },
+    });
+
+    // Cascades remove the order line items. Safe now that the invoice is gone.
+    await tx.order.delete({
+      where: {
+        id: invoice.orderId,
+      },
+    });
+  });
+
+  redirect("/invoices?deleted=1");
+}
+
+export async function deleteCustomer(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const customerId = Number(formData.get("customerId"));
+
+  if (!Number.isInteger(customerId)) {
+    redirect(`/customers/${customerId || ""}/edit?error=delete`);
+  }
+
+  const customer = await prisma.customer.findUnique({
+    where: {
+      id: customerId,
+    },
+    select: {
+      id: true,
+      _count: {
+        select: {
+          orders: true,
+          invoices: true,
+          payments: true,
+        },
+      },
+    },
+  });
+
+  if (!customer) {
+    redirect(`/customers/${customerId}/edit?error=delete`);
+  }
+
+  // Customers with orders, invoices, or payments still hold financial history.
+  // Those records must be cleared first (delete their invoices separately) so
+  // we never silently wipe data that feeds the reports.
+  if (
+    customer._count.orders > 0 ||
+    customer._count.invoices > 0 ||
+    customer._count.payments > 0
+  ) {
+    redirect(`/customers/${customerId}/edit?error=history`);
+  }
+
+  // Vehicles and account entries are removed by the schema cascade.
+  await prisma.customer.delete({
+    where: {
+      id: customerId,
+    },
+  });
+
+  redirect("/customers/search?deleted=1");
+}
