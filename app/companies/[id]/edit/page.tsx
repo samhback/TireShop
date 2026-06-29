@@ -81,6 +81,25 @@ export default async function EditCompanyPage({
                 />
               </div>
 
+              <div className="field">
+                <label htmlFor="email">Email</label>
+                <input
+                  defaultValue={company.email ?? ""}
+                  id="email"
+                  name="email"
+                  type="email"
+                />
+              </div>
+
+              <div className="field form-grid-wide">
+                <label htmlFor="billingAddress">Billing Address</label>
+                <textarea
+                  defaultValue={company.billingAddress ?? ""}
+                  id="billingAddress"
+                  name="billingAddress"
+                />
+              </div>
+
               <CompanyMarkupFields
                 defaultEnabled={company.useCompanyMarkup}
                 defaultMarkupPercent={company.markupPercent.toString()}

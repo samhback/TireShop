@@ -253,6 +253,8 @@ export async function createCompany(formData: FormData) {
   const company = await prisma.company.create({
     data: {
       name,
+      billingAddress: nullableValue(formData, "billingAddress"),
+      email: nullableValue(formData, "email"),
       useCompanyMarkup,
       markupPercent,
       notes: nullableValue(formData, "notes"),
@@ -293,6 +295,8 @@ export async function updateCompany(formData: FormData) {
     },
     data: {
       name,
+      billingAddress: nullableValue(formData, "billingAddress"),
+      email: nullableValue(formData, "email"),
       useCompanyMarkup,
       ...(markupPercent === null ? {} : { markupPercent }),
       notes: nullableValue(formData, "notes"),

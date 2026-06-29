@@ -159,6 +159,18 @@ export default async function CompanyPage({
           <p className="error">Unable to add that customer to this company.</p>
         ) : null}
 
+        {company.email || company.billingAddress ? (
+          <div className="form-section">
+            <h2>Company Details</h2>
+            {company.email ? <p>Email: {company.email}</p> : null}
+            {company.billingAddress ? (
+              <p style={{ whiteSpace: "pre-line" }}>
+                Billing Address: {company.billingAddress}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
         {company.notes ? (
           <div className="form-section">
             <h2>Notes</h2>

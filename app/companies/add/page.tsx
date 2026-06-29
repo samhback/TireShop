@@ -54,6 +54,16 @@ export default async function AddCompanyPage({
                 <input id="name" name="name" required />
               </div>
 
+              <div className="field">
+                <label htmlFor="email">Email</label>
+                <input id="email" name="email" type="email" />
+              </div>
+
+              <div className="field form-grid-wide">
+                <label htmlFor="billingAddress">Billing Address</label>
+                <textarea id="billingAddress" name="billingAddress" />
+              </div>
+
               <CompanyMarkupFields />
 
               <div className="field form-grid-wide">

@@ -104,6 +104,8 @@ model ServiceItem {
 model Company {
   id               Int        @id @default(autoincrement())
   name             String
+  billingAddress   String?    @map("billing_address")
+  email            String?
   useCompanyMarkup Boolean    @default(false) @map("use_company_markup")
   markupPercent    Decimal    @default(0) @map("markup_percent") @db.Decimal(5, 2)
   notes            String?
