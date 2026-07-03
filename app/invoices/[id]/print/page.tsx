@@ -88,7 +88,7 @@ export default async function InvoicePrintPage({ params }: InvoicePrintPageProps
           <div>
             <p className="eyebrow">Healdton Service Center</p>
             <p className="shop-address">
-              <strong>Billing Address:</strong> 10202 SH-76, Healdton, Oklahoma
+              <strong>Billing Address:</strong> P.O. Box 156, Healdton, OK 73438
             </p>
             <h1>Invoice</h1>
             <p>{invoice.invoiceNumber}</p>
