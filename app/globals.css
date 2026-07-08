@@ -1665,6 +1665,154 @@ h1 {
   padding: 42px;
 }
 
+.statement-document {
+  width: min(100%, 900px);
+  margin: 0 auto;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 55px rgba(23, 32, 28, 0.16);
+  padding: 42px;
+  color: #1b211e;
+  font-size: 13px;
+}
+
+.statement-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.statement-shop {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statement-shop strong {
+  font-size: 15px;
+}
+
+.statement-title {
+  text-align: right;
+}
+
+.statement-title h1 {
+  font-size: 18px;
+  margin: 0 0 6px;
+}
+
+.statement-title p {
+  margin: 2px 0;
+}
+
+.statement-billto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 28px 0 16px;
+}
+
+.statement-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.statement-table thead th {
+  text-align: left;
+  border-top: 1px solid #1b211e;
+  border-bottom: 1px solid #1b211e;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.statement-table .statement-num {
+  text-align: right;
+}
+
+.statement-row td {
+  padding: 6px 6px 0;
+  font-weight: 600;
+}
+
+.statement-subrow td {
+  padding: 0 6px 6px;
+  font-size: 11px;
+  color: #4c554e;
+  border-bottom: 1px dotted #c4ccc4;
+}
+
+.statement-subrow .statement-balance {
+  text-align: right;
+  font-style: italic;
+  font-weight: 700;
+  color: #1b211e;
+}
+
+.statement-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 36px;
+}
+
+.statement-aging {
+  align-self: flex-end;
+  min-width: 320px;
+}
+
+.statement-aging-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.statement-aging-head {
+  border-bottom: 1px solid #1b211e;
+  padding-bottom: 2px;
+  margin-bottom: 4px;
+  font-weight: 700;
+}
+
+.statement-totals {
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.statement-totals > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.statement-balance-due {
+  border: 1px solid #1b211e;
+  padding: 6px 8px;
+  font-size: 15px;
+}
+
+.statement-payto {
+  margin-top: 32px;
+}
+
+.statement-payto p {
+  margin: 4px 0;
+}
+
+.statement-thanks {
+  text-align: center;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  margin-top: 18px !important;
+}
+
+.statement-invoice-page {
+  break-before: page;
+  page-break-before: always;
+  margin-top: 32px;
+}
+
 .quote-header {
   display: flex;
   align-items: flex-start;
@@ -2193,6 +2341,17 @@ h1 {
     border-radius: 0;
     box-shadow: none;
     padding: 0;
+  }
+
+  .statement-document {
+    width: 100%;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  .statement-invoice-page {
+    margin-top: 0;
   }
 
   .print-hidden {

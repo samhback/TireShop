@@ -364,8 +364,21 @@ function createOrderNumber() {
   return `HSC-${Date.now().toString(36).toUpperCase()}`;
 }
 
-function createInvoiceNumber() {
-  return `INV-${Date.now().toString(36).toUpperCase()}`;
+const FIRST_INVOICE_NUMBER = 1000;
+
+// Sequential numeric invoice numbers (1000, 1001, ...). Computed inside the
+// creating transaction so two invoices made at once can't reuse a value. The
+// unique constraint on invoiceNumber is the final backstop.
+async function nextInvoiceNumber(tx: Prisma.TransactionClient) {
+  const rows = await tx.$queryRaw<{ max: number | null }[]>`
+    SELECT MAX(invoice_number::int) AS max
+    FROM "invoices"
+    WHERE invoice_number ~ '^[0-9]+$'
+  `;
+  const currentMax = Number(rows[0]?.max ?? 0);
+  return String(
+    currentMax >= FIRST_INVOICE_NUMBER ? currentMax + 1 : FIRST_INVOICE_NUMBER,
+  );
 }
 
 function orderLineTotal(
@@ -2313,7 +2326,7 @@ export async function completeOrder(formData: FormData) {
 
     const createdInvoice = await tx.invoice.create({
       data: {
-        invoiceNumber: createInvoiceNumber(),
+        invoiceNumber: await nextInvoiceNumber(tx),
         orderId: order.id,
         customerId: order.customerId,
         vehicleId: order.vehicleId,
@@ -2558,7 +2571,7 @@ export async function createQuickInvoice(formData: FormData) {
 
     return tx.invoice.create({
       data: {
-        invoiceNumber: createInvoiceNumber(),
+        invoiceNumber: await nextInvoiceNumber(tx),
         orderId: order.id,
         customerId: customer.id,
         status: "unpaid",
@@ -2964,4 +2977,241 @@ export async function deleteCustomer(formData: FormData) {
   });
 
   redirect("/customers/search?deleted=1");
+}
+
+function statementRangeDate(value: string, endOfDay: boolean) {
+  const date = new Date(`${value}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  if (endOfDay) {
+    date.setHours(23, 59, 59, 999);
+  }
+
+  return date;
+}
+
+export async function createCompanyStatement(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const companyId = Number(formData.get("companyId"));
+  const mode = String(formData.get("mode") ?? "all");
+  const isRange = mode === "range";
+
+  if (!Number.isInteger(companyId)) {
+    redirect("/company-invoices?error=invalid");
+  }
+
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { id: true },
+  });
+
+  if (!company) {
+    redirect("/company-invoices?error=invalid");
+  }
+
+  let rangeStart: Date | null = null;
+  let rangeEnd: Date | null = null;
+
+  if (isRange) {
+    rangeStart = statementRangeDate(String(formData.get("start") ?? ""), false);
+    rangeEnd = statementRangeDate(String(formData.get("end") ?? ""), true);
+
+    if (!rangeStart || !rangeEnd || rangeStart > rangeEnd) {
+      redirect(`/company-invoices?error=range&companyId=${companyId}`);
+    }
+  }
+
+  // Only bill company-car invoices that are still unpaid and not already on
+  // another statement.
+  const invoices = await prisma.invoice.findMany({
+    where: {
+      status: "unpaid",
+      companyInvoiceId: null,
+      order: {
+        companyId,
+        isCompanyCar: true,
+      },
+      ...(isRange
+        ? { createdAt: { gte: rangeStart!, lte: rangeEnd! } }
+        : {}),
+    },
+    select: {
+      id: true,
+      subtotal: true,
+      taxAmount: true,
+      total: true,
+    },
+  });
+
+  if (invoices.length === 0) {
+    redirect(`/company-invoices?error=none&companyId=${companyId}`);
+  }
+
+  const subtotal = invoices.reduce(
+    (sum, invoice) => sum + Number(invoice.subtotal.toString()),
+    0,
+  );
+  const taxAmount = invoices.reduce(
+    (sum, invoice) => sum + Number(invoice.taxAmount.toString()),
+    0,
+  );
+  const total = invoices.reduce(
+    (sum, invoice) => sum + Number(invoice.total.toString()),
+    0,
+  );
+
+  const statement = await prisma.$transaction(async (tx) => {
+    const created = await tx.companyInvoice.create({
+      data: {
+        companyId,
+        rangeStart,
+        rangeEnd,
+        subtotal,
+        taxAmount,
+        total,
+        createdBy: employee,
+      },
+    });
+
+    await tx.invoice.updateMany({
+      where: {
+        id: { in: invoices.map((invoice) => invoice.id) },
+      },
+      data: {
+        companyInvoiceId: created.id,
+      },
+    });
+
+    return created;
+  });
+
+  redirect(`/company-invoices/${statement.id}?created=1`);
+}
+
+export async function markCompanyStatementPaid(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const statementId = Number(formData.get("statementId"));
+  const paymentMethod = String(formData.get("paymentMethod") ?? "").trim();
+
+  if (!Number.isInteger(statementId) || !paymentMethod) {
+    redirect(`/company-invoices/${statementId || ""}?error=payment`);
+  }
+
+  const statement = await prisma.companyInvoice.findUnique({
+    where: { id: statementId },
+    select: {
+      id: true,
+      status: true,
+      invoices: {
+        select: {
+          id: true,
+          status: true,
+          total: true,
+          customerId: true,
+        },
+      },
+    },
+  });
+
+  if (!statement) {
+    redirect(`/company-invoices/${statementId}?error=payment`);
+  }
+
+  if (statement.status === "paid") {
+    redirect(`/company-invoices/${statement.id}?paid=1`);
+  }
+
+  const paidAt = new Date();
+
+  await prisma.$transaction(async (tx) => {
+    await tx.companyInvoice.update({
+      where: { id: statement.id },
+      data: {
+        status: "paid",
+        paidAt,
+        paidByUsername: employee,
+        paymentMethod,
+      },
+    });
+
+    // Marking the statement paid pays every invoice on it, each with its own
+    // payment record so the receipts/revenue reports stay accurate.
+    for (const invoice of statement.invoices) {
+      if (invoice.status === "paid") {
+        continue;
+      }
+
+      await tx.invoice.update({
+        where: { id: invoice.id },
+        data: {
+          status: "paid",
+          paidAt,
+          paidByUsername: employee,
+        },
+      });
+
+      await tx.payment.create({
+        data: {
+          invoiceId: invoice.id,
+          customerId: invoice.customerId,
+          amount: invoice.total,
+          method: paymentMethod,
+          purpose: "invoice",
+          receivedByUsername: employee,
+        },
+      });
+    }
+  });
+
+  redirect(`/company-invoices/${statement.id}?paid=1`);
+}
+
+export async function deleteCompanyStatement(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const statementId = Number(formData.get("statementId"));
+
+  if (!Number.isInteger(statementId)) {
+    redirect(`/company-invoices/${statementId || ""}?error=delete`);
+  }
+
+  const statement = await prisma.companyInvoice.findUnique({
+    where: { id: statementId },
+    select: { id: true, status: true },
+  });
+
+  if (!statement) {
+    redirect(`/company-invoices/${statementId}?error=delete`);
+  }
+
+  // A paid statement already recorded payments against its invoices; deleting
+  // it would strand that money, so block it.
+  if (statement.status === "paid") {
+    redirect(`/company-invoices/${statement.id}?error=paidDelete`);
+  }
+
+  // The invoices' companyInvoiceId is set null by the schema, releasing them
+  // back to be billed again.
+  await prisma.companyInvoice.delete({
+    where: { id: statement.id },
+  });
+
+  redirect("/company-invoices?deleted=1");
 }

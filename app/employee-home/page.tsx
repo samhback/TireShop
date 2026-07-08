@@ -4,6 +4,7 @@ import {
   Boxes,
   Building2,
   ClipboardList,
+  FileStack,
   FileText,
   ShoppingCart,
   UserRound,
@@ -63,6 +64,12 @@ const dashboardItems = [
     description: "Create invoices, record payments, and track unpaid work.",
     href: "/invoices",
     icon: FileText,
+  },
+  {
+    title: "Company Invoices",
+    description: "Bill companies for many invoices at once with a statement.",
+    href: "/company-invoices",
+    icon: FileStack,
   },
 ];
 

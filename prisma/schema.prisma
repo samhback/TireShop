@@ -111,6 +111,7 @@ model Company {
   notes            String?
   customers        Customer[]
   orders           Order[]
+  companyInvoices  CompanyInvoice[]
   createdAt        DateTime   @default(now()) @map("created_at")
   updatedAt        DateTime   @updatedAt @map("updated_at")
 
@@ -251,6 +252,8 @@ model Invoice {
   customer               Customer               @relation(fields: [customerId], references: [id], onDelete: Restrict)
   vehicleId              Int?                   @map("vehicle_id")
   vehicle                Vehicle?               @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  companyInvoiceId       Int?                   @map("company_invoice_id")
+  companyInvoice         CompanyInvoice?        @relation(fields: [companyInvoiceId], references: [id], onDelete: SetNull)
   status                 String                 @default("unpaid")
   subtotal               Decimal                @db.Decimal(10, 2)
   taxableSubtotal        Decimal                @default(0) @map("taxable_subtotal") @db.Decimal(10, 2)
@@ -268,9 +271,34 @@ model Invoice {
   @@index([invoiceNumber])
   @@index([customerId])
   @@index([vehicleId])
+  @@index([companyInvoiceId])
   @@index([status])
   @@index([paidAt])
   @@map("invoices")
+}
+
+model CompanyInvoice {
+  id             Int       @id @default(autoincrement())
+  companyId      Int       @map("company_id")
+  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  status         String    @default("unpaid")
+  statementDate  DateTime  @default(now()) @map("statement_date")
+  rangeStart     DateTime? @map("range_start")
+  rangeEnd       DateTime? @map("range_end")
+  subtotal       Decimal   @db.Decimal(10, 2)
+  taxAmount      Decimal   @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  total          Decimal   @db.Decimal(10, 2)
+  paidAt         DateTime? @map("paid_at")
+  paidByUsername String?   @map("paid_by_username")
+  paymentMethod  String?   @map("payment_method")
+  createdBy      String?   @map("created_by")
+  invoices       Invoice[]
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([companyId])
+  @@index([status])
+  @@map("company-invoices")
 }
 
 model InvoiceLineItem {
