@@ -2352,6 +2352,51 @@ h1 {
 
   .statement-invoice-page {
     margin-top: 0;
+    break-before: page;
+    page-break-before: always;
+    break-inside: avoid;
+  }
+
+  /* Keep each invoice behind the statement to a single page: the full-size
+     invoice spacing tips a typical invoice just over one page. */
+  .statement-invoice-page .quote-info-grid {
+    padding: 12px 0;
+  }
+
+  .statement-invoice-page .quote-table {
+    margin-top: 12px;
+  }
+
+  .statement-invoice-page .quote-table th,
+  .statement-invoice-page .quote-table td {
+    padding: 6px 8px;
+  }
+
+  .statement-invoice-page .quote-total {
+    margin-top: 12px;
+    font-size: 15px;
+  }
+
+  .statement-invoice-page .quote-total strong {
+    font-size: 18px;
+  }
+
+  .statement-invoice-page .quote-total-secondary {
+    margin-top: 6px;
+    font-size: 13px;
+  }
+
+  .statement-invoice-page .quote-total-secondary strong {
+    font-size: 15px;
+  }
+
+  .statement-invoice-page .quote-footer {
+    margin-top: 16px;
+    padding-top: 10px;
+  }
+
+  .statement-invoice-group {
+    break-inside: avoid;
   }
 
   .print-hidden {
