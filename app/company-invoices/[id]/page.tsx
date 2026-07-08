@@ -128,12 +128,6 @@ export default async function CompanyStatementPage({
         {query?.error === "payment" ? (
           <p className="error">Unable to record payment. Choose a method.</p>
         ) : null}
-        {query?.error === "paidDelete" ? (
-          <p className="error">
-            A paid statement cannot be deleted; its payments are already
-            recorded.
-          </p>
-        ) : null}
         {query?.error === "delete" ? (
           <p className="error">Unable to delete this statement.</p>
         ) : null}
@@ -239,26 +233,26 @@ export default async function CompanyStatementPage({
           </div>
         </div>
 
-        {!isPaid ? (
-          <div className="form-section">
-            <div className="section-heading-row">
-              <div>
-                <h2>Delete Statement</h2>
-                <p className="helper">
-                  Removes this statement and releases its invoices to be billed
-                  again. The invoices themselves are not deleted.
-                </p>
-              </div>
-              <DeleteButton
-                action={deleteCompanyStatement}
-                fieldName="statementId"
-                fieldValue={statement.id}
-                label="Delete Statement"
-                confirmMessage={`Delete this statement for ${statement.company.name}? Its ${statement.invoices.length} invoice(s) will be released to bill again.`}
-              />
+        <div className="form-section">
+          <div className="section-heading-row">
+            <div>
+              <h2>Delete Statement</h2>
+              <p className="helper">
+                Removes this statement only. The {statement.invoices.length}{" "}
+                invoice{statement.invoices.length === 1 ? "" : "s"} on it are not
+                deleted and keep their current paid/unpaid status
+                {isPaid ? "" : " (they become available to bill again)"}.
+              </p>
             </div>
+            <DeleteButton
+              action={deleteCompanyStatement}
+              fieldName="statementId"
+              fieldValue={statement.id}
+              label="Delete Statement"
+              confirmMessage={`Delete this statement for ${statement.company.name}? Its ${statement.invoices.length} invoice(s) will NOT be deleted.`}
+            />
           </div>
-        ) : null}
+        </div>
       </section>
     </main>
   );

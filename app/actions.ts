@@ -3201,14 +3201,9 @@ export async function deleteCompanyStatement(formData: FormData) {
     redirect(`/company-invoices/${statementId}?error=delete`);
   }
 
-  // A paid statement already recorded payments against its invoices; deleting
-  // it would strand that money, so block it.
-  if (statement.status === "paid") {
-    redirect(`/company-invoices/${statement.id}?error=paidDelete`);
-  }
-
-  // The invoices' companyInvoiceId is set null by the schema, releasing them
-  // back to be billed again.
+  // Deleting the statement never touches the invoices themselves: the schema's
+  // SetNull just detaches them (companyInvoiceId -> null). Any payments already
+  // recorded when the statement was marked paid stay in place.
   await prisma.companyInvoice.delete({
     where: { id: statement.id },
   });
