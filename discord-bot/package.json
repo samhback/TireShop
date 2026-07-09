@@ -1,0 +1,20 @@
+{
+  "name": "roblox-football-league-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "db:create": "wrangler d1 create roblox-football-league-bot",
+    "db:migrate:local": "wrangler d1 migrations apply roblox-football-league-bot --local",
+    "db:migrate:remote": "wrangler d1 migrations apply roblox-football-league-bot --remote",
+    "commands:register": "node scripts/register-commands.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "latest",
+    "typescript": "latest",
+    "wrangler": "latest"
+  }
+}

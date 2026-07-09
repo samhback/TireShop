@@ -24,6 +24,97 @@ function servicePrice(service: ServiceResult) {
     : `$${service.hourlyRate ?? "0.00"}/hr`;
 }
 
+function estimatedHoursPerUnit(service: ServiceResult) {
+  const parsed = Number(service.estimatedHours ?? "1");
+  return Number.isNaN(parsed) || parsed <= 0 ? 1 : parsed;
+}
+
+function ServiceResultCard({
+  orderId,
+  service,
+}: {
+  orderId: number;
+  service: ServiceResult;
+}) {
+  const isHourly = service.pricingMethod === "hourly";
+  const [manual, setManual] = useState(false);
+  const [quantity, setQuantity] = useState("1");
+  const [hours, setHours] = useState(service.estimatedHours ?? "1");
+
+  const parsedQuantity = Number(quantity);
+  const computedHours =
+    Number.isNaN(parsedQuantity) || parsedQuantity <= 0
+      ? null
+      : parsedQuantity * estimatedHoursPerUnit(service);
+
+  return (
+    <article className="customer-result-card">
+      <div className="customer-result-header">
+        <div>
+          <h3>{service.name}</h3>
+          <p>
+            {servicePrice(service)}
+            {isHourly && service.estimatedHours
+              ? ` | Est. ${service.estimatedHours} hr`
+              : ""}
+          </p>
+        </div>
+        <form
+          action={addServiceToOrder}
+          className="inline-qty-form service-add-form"
+          data-preserve-scroll="true"
+        >
+          <input name="orderId" type="hidden" value={orderId} />
+          <input name="serviceId" type="hidden" value={service.id} />
+          {isHourly ? (
+            <label className="checkbox-line">
+              <input
+                checked={manual}
+                name="manualHoursMode"
+                onChange={(event) => setManual(event.target.checked)}
+                type="checkbox"
+                value="true"
+              />
+              Manual hours
+            </label>
+          ) : null}
+          {isHourly && manual ? (
+            <label>
+              Hours
+              <input
+                min="0.25"
+                name="manualHours"
+                onChange={(event) => setHours(event.target.value)}
+                step="0.25"
+                type="number"
+                value={hours}
+              />
+            </label>
+          ) : (
+            <label>
+              Qty
+              <input
+                min="1"
+                name="quantity"
+                onChange={(event) => setQuantity(event.target.value)}
+                step="1"
+                type="number"
+                value={quantity}
+              />
+            </label>
+          )}
+          {isHourly && !manual && computedHours !== null ? (
+            <span className="qty-hint">= {computedHours} hr</span>
+          ) : null}
+          <button className="secondary-button" type="submit">
+            Add
+          </button>
+        </form>
+      </div>
+    </article>
+  );
+}
+
 function inventorySubtitle(item: InventoryResult) {
   return [
     item.brand,
@@ -113,21 +204,11 @@ export function OrderLineItemSearch({
           </div>
           <div className="compact-result-list">
             {serviceResults.map((service) => (
-              <article className="customer-result-card" key={service.id}>
-                <div className="customer-result-header">
-                  <div>
-                    <h3>{service.name}</h3>
-                    <p>{servicePrice(service)}</p>
-                  </div>
-                  <form action={addServiceToOrder} data-preserve-scroll="true">
-                    <input name="orderId" type="hidden" value={orderId} />
-                    <input name="serviceId" type="hidden" value={service.id} />
-                    <button className="secondary-button" type="submit">
-                      Add
-                    </button>
-                  </form>
-                </div>
-              </article>
+              <ServiceResultCard
+                key={service.id}
+                orderId={orderId}
+                service={service}
+              />
             ))}
           </div>
         </div>

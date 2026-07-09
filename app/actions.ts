@@ -1887,10 +1887,42 @@ export async function addServiceToOrder(formData: FormData) {
     redirect(`/orders/${orderId}?error=lineItem`);
   }
 
-  const quantity =
-    service.pricingMethod === "hourly"
-      ? Number(service.estimatedHours?.toString() ?? "1")
-      : 1;
+  const enteredQuantity = Number(formData.get("quantity") ?? "1");
+  let quantity = 1;
+
+  if (service.pricingMethod === "hourly") {
+    const manualHoursMode =
+      String(formData.get("manualHoursMode") ?? "") === "true";
+
+    if (manualHoursMode) {
+      const manualHours = Number(formData.get("manualHours"));
+
+      if (Number.isNaN(manualHours) || manualHours <= 0) {
+        redirect(`/orders/${orderId}?error=lineItem`);
+      }
+
+      quantity = manualHours;
+    } else {
+      if (Number.isNaN(enteredQuantity) || enteredQuantity <= 0) {
+        redirect(`/orders/${orderId}?error=lineItem`);
+      }
+
+      const estimatedHours = Number(service.estimatedHours?.toString() ?? "1");
+      const hoursPerUnit =
+        Number.isNaN(estimatedHours) || estimatedHours <= 0
+          ? 1
+          : estimatedHours;
+
+      quantity = enteredQuantity * hoursPerUnit;
+    }
+  } else {
+    if (Number.isNaN(enteredQuantity) || enteredQuantity <= 0) {
+      redirect(`/orders/${orderId}?error=lineItem`);
+    }
+
+    quantity = enteredQuantity;
+  }
+
   const unitPrice = Number(
     service.pricingMethod === "hourly"
       ? service.hourlyRate?.toString() ?? "0"

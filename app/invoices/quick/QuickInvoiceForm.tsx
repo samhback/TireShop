@@ -47,6 +47,13 @@ type QuickLine = {
   quantity: number;
 };
 
+type QuickServiceLine = {
+  id: number;
+  manualHours: boolean;
+  units: number;
+  hours: number;
+};
+
 type QuickInvoiceFormProps = {
   companies: CompanyOption[];
   employees: EmployeeOption[];
@@ -60,12 +67,19 @@ function servicePrice(service: ServiceOption) {
     : `$${service.flatPrice ?? "0.00"}`;
 }
 
-function serviceDefaultQuantity(service: ServiceOption) {
-  if (service.pricingMethod === "hourly" && service.estimatedHours) {
-    return Number(service.estimatedHours);
+function estimatedHoursPerUnit(service: ServiceOption) {
+  const parsed = Number(service.estimatedHours ?? "1");
+  return Number.isNaN(parsed) || parsed <= 0 ? 1 : parsed;
+}
+
+function finalServiceQuantity(service: ServiceOption, line: QuickServiceLine) {
+  if (service.pricingMethod !== "hourly") {
+    return line.units;
   }
 
-  return 1;
+  return line.manualHours
+    ? line.hours
+    : line.units * estimatedHoursPerUnit(service);
 }
 
 function inventoryLabel(item: InventoryOption) {
@@ -96,7 +110,7 @@ export function QuickInvoiceForm({
   const [selectedInventoryId, setSelectedInventoryId] = useState(
     inventoryItems[0]?.id.toString() ?? "",
   );
-  const [serviceLines, setServiceLines] = useState<QuickLine[]>([]);
+  const [serviceLines, setServiceLines] = useState<QuickServiceLine[]>([]);
   const [inventoryLines, setInventoryLines] = useState<QuickLine[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState("");
   const [isCompanyCar, setIsCompanyCar] = useState(false);
@@ -146,7 +160,9 @@ export function QuickInvoiceForm({
       ...lines,
       {
         id: service.id,
-        quantity: serviceDefaultQuantity(service),
+        manualHours: false,
+        units: 1,
+        hours: estimatedHoursPerUnit(service),
       },
     ]);
   }
@@ -168,10 +184,13 @@ export function QuickInvoiceForm({
     ]);
   }
 
-  function updateServiceLine(index: number, quantity: number) {
+  function updateServiceLine(
+    index: number,
+    changes: Partial<QuickServiceLine>,
+  ) {
     setServiceLines((lines) =>
       lines.map((line, lineIndex) =>
-        lineIndex === index ? { ...line, quantity } : line,
+        lineIndex === index ? { ...line, ...changes } : line,
       ),
     );
   }
@@ -197,13 +216,18 @@ export function QuickInvoiceForm({
   const estimatedTotal = [
     ...serviceLines.map((line) => {
       const service = serviceMap.get(line.id);
+
+      if (!service) {
+        return 0;
+      }
+
       const unitPrice = Number(
-        service?.pricingMethod === "hourly"
+        service.pricingMethod === "hourly"
           ? service.hourlyRate ?? 0
-          : service?.flatPrice ?? 0,
+          : service.flatPrice ?? 0,
       );
 
-      return line.quantity * unitPrice;
+      return finalServiceQuantity(service, line) * unitPrice;
     }),
     ...inventoryLines.map((line) => {
       const item = inventoryMap.get(line.id);
@@ -217,7 +241,21 @@ export function QuickInvoiceForm({
 
   return (
     <form className="customer-form" action={createQuickInvoice}>
-      <input name="serviceLines" type="hidden" value={JSON.stringify(serviceLines)} />
+      <input
+        name="serviceLines"
+        type="hidden"
+        value={JSON.stringify(
+          serviceLines.flatMap((line) => {
+            const service = serviceMap.get(line.id);
+
+            if (!service) {
+              return [];
+            }
+
+            return [{ id: line.id, quantity: finalServiceQuantity(service, line) }];
+          }),
+        )}
+      />
       <input
         name="inventoryLines"
         type="hidden"
@@ -308,6 +346,10 @@ export function QuickInvoiceForm({
                 return null;
               }
 
+              const isHourly = service.pricingMethod === "hourly";
+              const computedHours =
+                line.units * estimatedHoursPerUnit(service);
+
               return (
                 <article className="customer-result-card" key={`${line.id}-${index}`}>
                   <div className="customer-result-header">
@@ -315,21 +357,60 @@ export function QuickInvoiceForm({
                       <h3>{service.name}</h3>
                       <p>
                         {service.category} | {servicePrice(service)}
+                        {isHourly && service.estimatedHours
+                          ? ` | Est. ${service.estimatedHours} hr`
+                          : ""}
                       </p>
                     </div>
-                    <div className="inline-qty-form">
-                      <label>
-                        {service.pricingMethod === "hourly" ? "Hours" : "Qty"}
-                        <input
-                          min="0.01"
-                          onChange={(event) =>
-                            updateServiceLine(index, Number(event.target.value))
-                          }
-                          step="0.01"
-                          type="number"
-                          value={line.quantity}
-                        />
-                      </label>
+                    <div className="inline-qty-form service-add-form">
+                      {isHourly ? (
+                        <label className="checkbox-line">
+                          <input
+                            checked={line.manualHours}
+                            onChange={(event) =>
+                              updateServiceLine(index, {
+                                manualHours: event.target.checked,
+                              })
+                            }
+                            type="checkbox"
+                          />
+                          Manual hours
+                        </label>
+                      ) : null}
+                      {isHourly && line.manualHours ? (
+                        <label>
+                          Hours
+                          <input
+                            min="0.25"
+                            onChange={(event) =>
+                              updateServiceLine(index, {
+                                hours: Number(event.target.value),
+                              })
+                            }
+                            step="0.25"
+                            type="number"
+                            value={line.hours}
+                          />
+                        </label>
+                      ) : (
+                        <label>
+                          Qty
+                          <input
+                            min="1"
+                            onChange={(event) =>
+                              updateServiceLine(index, {
+                                units: Number(event.target.value),
+                              })
+                            }
+                            step="1"
+                            type="number"
+                            value={line.units}
+                          />
+                        </label>
+                      )}
+                      {isHourly && !line.manualHours ? (
+                        <span className="qty-hint">= {computedHours} hr</span>
+                      ) : null}
                       <button
                         aria-label={`Remove ${service.name}`}
                         className="icon-button danger-icon-button"

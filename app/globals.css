@@ -1122,6 +1122,41 @@ h1 {
   padding: 8px 10px;
 }
 
+.service-add-form {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 250px;
+}
+
+.inline-qty-form .checkbox-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.service-add-form .checkbox-line {
+  flex-basis: 100%;
+  justify-content: flex-end;
+}
+
+.inline-qty-form input[type="checkbox"] {
+  width: 16px;
+  min-height: 0;
+  height: 16px;
+  accent-color: var(--primary);
+}
+
+.qty-hint {
+  align-self: end;
+  padding-bottom: 9px;
+  color: #5a6b62;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .inline-add-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

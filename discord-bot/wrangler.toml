@@ -1,0 +1,8 @@
+name = "roblox-football-league-bot"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "roblox-football-league-bot"
+database_id = "f4f67824-31e5-44df-86c7-36686bbb1838"
