@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSession } from "@/lib/session";
-import { formatTaxRatePercent, getSalesTaxRate, lineItemTaxable } from "@/lib/tax";
+import { formatTaxRatePercent, getSalesTaxRate } from "@/lib/tax";
 import { PrintButton } from "./PrintButton";
 
 type QuotePageProps = {
@@ -90,7 +90,7 @@ export default async function QuotePage({ params }: QuotePageProps) {
   );
   const taxableSubtotal = order.lineItems.reduce(
     (total, item) =>
-      total + (lineItemTaxable(item) ? Number(item.lineTotal.toString()) : 0),
+      total + (item.taxable ? Number(item.lineTotal.toString()) : 0),
     0,
   );
   const taxRate = getSalesTaxRate();

@@ -406,6 +406,9 @@ function calculateInvoiceTotals(
     lineTotal: number | { toString(): string };
     taxable: boolean;
   }[],
+  // Recomputing an existing invoice should preserve its stored rate rather than
+  // adopting the current environment rate; new invoices pass nothing.
+  rateOverride?: number,
 ) {
   const subtotal = lineItems.reduce(
     (total, lineItem) => total + Number(lineItem.lineTotal.toString()),
@@ -416,7 +419,7 @@ function calculateInvoiceTotals(
       total + (lineItem.taxable ? Number(lineItem.lineTotal.toString()) : 0),
     0,
   );
-  const taxRate = currentTaxRate();
+  const taxRate = rateOverride ?? currentTaxRate();
   const taxAmount = Number((taxableSubtotal * taxRate).toFixed(2));
 
   return {
@@ -1938,6 +1941,7 @@ export async function addServiceToOrder(formData: FormData) {
       quantity,
       unitPrice,
       lineTotal: orderLineTotal(quantity, unitPrice),
+      taxable: service.taxable,
       notes: service.description,
     },
   });
@@ -2026,6 +2030,7 @@ export async function addInventoryToOrder(formData: FormData) {
         quantity,
         unitPrice,
         lineTotal: orderLineTotal(quantity, unitPrice),
+        taxable: item.taxable,
         notes:
           [
             item.brand,
@@ -2042,6 +2047,7 @@ export async function addInventoryToOrder(formData: FormData) {
         quantity: line.quantity,
         unitPrice: line.unitPrice,
         lineTotal: line.lineTotal,
+        taxable: false,
         notes: line.notes,
       })),
     ],
@@ -2085,6 +2091,7 @@ export async function addCustomLineToOrder(formData: FormData) {
       quantity,
       unitPrice,
       lineTotal: orderLineTotal(quantity, unitPrice),
+      taxable: !isTireDisposalLine(description),
       notes: nullableValue(formData, "notes"),
     },
   });
@@ -2126,6 +2133,7 @@ export async function updateOrderLineItemAdjustment(formData: FormData) {
   const lineItemId = Number(formData.get("lineItemId"));
   const discountPercent = Number(formData.get("discountPercent") || 0);
   const complementary = formData.get("complementary") === "on";
+  const taxable = formData.get("taxable") === "on";
 
   if (
     !Number.isInteger(orderId) ||
@@ -2160,6 +2168,7 @@ export async function updateOrderLineItemAdjustment(formData: FormData) {
     },
     data: {
       complementary,
+      taxable,
       discountPercent: complementary ? 0 : discountPercent,
       lineTotal: orderLineTotal(
         quantity,
@@ -2299,14 +2308,9 @@ export async function completeOrder(formData: FormData) {
   }
 
   const invoiceLineItems = order.lineItems.map((lineItem) => {
-    const taxable =
-      lineItem.lineType === "inventory"
-        ? lineItem.inventoryItem?.taxable ?? true
-        : lineItem.lineType === "service"
-          ? lineItem.serviceItem?.taxable ?? true
-          : isTireDisposalLine(lineItem.description)
-            ? false
-          : true;
+    // Carry the taxable flag set on the order line (which may have been
+    // overridden by staff) straight through to the invoice.
+    const taxable = lineItem.taxable;
 
     return {
       lineType: lineItem.lineType,
@@ -2594,6 +2598,7 @@ export async function createQuickInvoice(formData: FormData) {
             unitPrice: lineItem.unitPrice,
             discountPercent: lineItem.discountPercent,
             complementary: lineItem.complementary,
+            taxable: lineItem.taxable,
             lineTotal: lineItem.lineTotal,
             notes: lineItem.notes,
           })),
@@ -2637,6 +2642,86 @@ export async function createQuickInvoice(formData: FormData) {
   });
 
   redirect(`/invoices/${invoice.id}?created=1`);
+}
+
+export async function updateInvoiceLineTaxable(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const invoiceId = Number(formData.get("invoiceId"));
+  const lineItemId = Number(formData.get("lineItemId"));
+  const taxable = formData.get("taxable") === "on";
+
+  if (!Number.isInteger(invoiceId) || !Number.isInteger(lineItemId)) {
+    redirect(`/invoices/${invoiceId || ""}?error=taxable`);
+  }
+
+  const invoice = await prisma.invoice.findUnique({
+    where: {
+      id: invoiceId,
+    },
+    include: {
+      lineItems: true,
+    },
+  });
+
+  if (!invoice) {
+    redirect(`/invoices/${invoiceId}?error=taxable`);
+  }
+
+  const targetLine = invoice.lineItems.find((line) => line.id === lineItemId);
+
+  if (!targetLine) {
+    redirect(`/invoices/${invoice.id}?error=taxable`);
+  }
+
+  // Do not alter amounts that have already been collected or rolled up into a
+  // company statement.
+  if (
+    invoice.status !== "unpaid" ||
+    invoice.paidAt ||
+    invoice.companyInvoiceId !== null
+  ) {
+    redirect(`/invoices/${invoice.id}?error=taxableLocked`);
+  }
+
+  const updatedLineItems = invoice.lineItems.map((line) =>
+    line.id === lineItemId ? { ...line, taxable } : line,
+  );
+  // Preserve the invoice's original tax rate rather than the current env rate.
+  const invoiceTotals = calculateInvoiceTotals(
+    updatedLineItems,
+    Number(invoice.taxRate.toString()),
+  );
+
+  await prisma.$transaction(async (tx) => {
+    await tx.invoiceLineItem.update({
+      where: {
+        id: lineItemId,
+      },
+      data: {
+        taxable,
+      },
+    });
+
+    await tx.invoice.update({
+      where: {
+        id: invoice.id,
+      },
+      data: {
+        subtotal: invoiceTotals.subtotal,
+        taxableSubtotal: invoiceTotals.taxableSubtotal,
+        taxRate: invoiceTotals.taxRate,
+        taxAmount: invoiceTotals.taxAmount,
+        total: invoiceTotals.total,
+      },
+    });
+  });
+
+  redirect(`/invoices/${invoice.id}?taxableUpdated=1`);
 }
 
 export async function markInvoicePaid(formData: FormData) {

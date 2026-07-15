@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { deleteInvoice, markInvoicePaid } from "@/app/actions";
+import {
+  deleteInvoice,
+  markInvoicePaid,
+  updateInvoiceLineTaxable,
+} from "@/app/actions";
 import { DeleteButton } from "@/app/DeleteButton";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSession } from "@/lib/session";
@@ -13,6 +17,7 @@ type InvoicePageProps = {
   searchParams?: Promise<{
     created?: string;
     paid?: string;
+    taxableUpdated?: string;
     error?: string;
   }>;
 };
@@ -96,6 +101,12 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
 
   const paramsValue = await searchParams;
   const isPaid = invoice.status === "paid";
+  // Taxability can only be edited before payment and before the invoice is
+  // rolled into a company statement.
+  const canEditTaxable =
+    invoice.status === "unpaid" &&
+    !invoice.paidAt &&
+    invoice.companyInvoiceId === null;
 
   return (
     <main className="placeholder-shell">
@@ -131,8 +142,20 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
         {paramsValue?.paid === "1" ? (
           <p className="success">Invoice marked as paid.</p>
         ) : null}
+        {paramsValue?.taxableUpdated === "1" ? (
+          <p className="success">Line item tax status updated.</p>
+        ) : null}
         {paramsValue?.error === "payment" ? (
           <p className="error">Unable to update invoice payment status.</p>
+        ) : null}
+        {paramsValue?.error === "taxable" ? (
+          <p className="error">Unable to update line item tax status.</p>
+        ) : null}
+        {paramsValue?.error === "taxableLocked" ? (
+          <p className="error">
+            Tax status can only be changed on unpaid invoices that are not part of
+            a company statement.
+          </p>
         ) : null}
         {paramsValue?.error === "delete" ? (
           <p className="error">Unable to delete this invoice.</p>
@@ -250,8 +273,35 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
                         {money(item.discountPercent)}% off
                       </span>
                     ) : null}
+                    {!item.taxable ? (
+                      <span className="line-badge">Non-taxable</span>
+                    ) : null}
                     <strong>${money(item.lineTotal)}</strong>
                   </div>
+                  {canEditTaxable ? (
+                    <details className="line-adjustment-panel">
+                      <summary>Tax</summary>
+                      <form
+                        action={updateInvoiceLineTaxable}
+                        className="line-adjustment-form"
+                        data-preserve-scroll="true"
+                      >
+                        <input name="invoiceId" type="hidden" value={invoice.id} />
+                        <input name="lineItemId" type="hidden" value={item.id} />
+                        <label className="checkbox-line">
+                          <input
+                            defaultChecked={item.taxable}
+                            name="taxable"
+                            type="checkbox"
+                          />
+                          Taxable
+                        </label>
+                        <button className="secondary-button" type="submit">
+                          Apply
+                        </button>
+                      </form>
+                    </details>
+                  ) : null}
                 </div>
               </article>
             ))}

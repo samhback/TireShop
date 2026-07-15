@@ -232,6 +232,7 @@ model OrderLineItem {
   unitPrice             Decimal          @map("unit_price") @db.Decimal(10, 2)
   discountPercent       Decimal          @default(0) @map("discount_percent") @db.Decimal(5, 2)
   complementary         Boolean          @default(false)
+  taxable               Boolean          @default(true)
   lineTotal             Decimal          @map("line_total") @db.Decimal(10, 2)
   notes                 String?
   createdAt             DateTime         @default(now()) @map("created_at")

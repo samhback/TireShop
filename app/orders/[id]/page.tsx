@@ -587,6 +587,9 @@ export default async function OrderDetailPage({
                           {money(item.discountPercent)}% off
                         </span>
                       ) : null}
+                      {!item.taxable ? (
+                        <span className="line-badge">Non-taxable</span>
+                      ) : null}
                       <strong>${money(item.lineTotal)}</strong>
                     </div>
                     {["service", "inventory"].includes(item.lineType) ? (
@@ -617,6 +620,14 @@ export default async function OrderDetailPage({
                               type="checkbox"
                             />
                             Complementary
+                          </label>
+                          <label className="checkbox-line">
+                            <input
+                              defaultChecked={item.taxable}
+                              name="taxable"
+                              type="checkbox"
+                            />
+                            Taxable
                           </label>
                           <button className="secondary-button" type="submit">
                             Apply
