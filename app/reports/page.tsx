@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import {
   BarChart3,
   Boxes,
+  Building2,
   Car,
   ClipboardList,
   DollarSign,
@@ -75,6 +76,12 @@ const reports = [
     description: "Open balances and unpaid invoice aging.",
     href: "/reports/unpaid-invoices",
     icon: FileWarning,
+  },
+  {
+    title: "All Company Paid/Unpaid Invoices",
+    description: "Company-car invoices across all companies, filtered by paid or unpaid.",
+    href: "/reports/all-company-invoices",
+    icon: Building2,
   },
   {
     title: "Customer Activity",

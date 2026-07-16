@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { salesCategoryLabel } from "@/lib/salesCategories";
 import { getEmployeeSession } from "@/lib/session";
+import { InvoiceDocument } from "@/app/invoices/[id]/print/InvoiceDocument";
 import { PrintButton } from "../PrintButton";
 
 type ReportPageProps = {
@@ -15,6 +16,8 @@ type ReportPageProps = {
     end?: string;
     companyId?: string;
     q?: string;
+    paid?: string;
+    docs?: string;
   }>;
 };
 
@@ -50,6 +53,7 @@ const reportTitles: Record<string, string> = {
   "employee-revenue": "Employee Revenue Report",
   "service-performed": "Service Performed Report",
   "unpaid-invoices": "Unpaid Invoices Report",
+  "all-company-invoices": "All Company Paid/Unpaid Invoices",
   "customer-activity": "Customer Activity Report",
   "vehicle-history": "Vehicle History Report",
   "average-repair-order": "Average Repair Order Report",
@@ -190,6 +194,42 @@ function DateFilter({ end, start }: { end: Date; start: Date }) {
       <label>
         End
         <input name="end" type="date" defaultValue={inputDate(end)} />
+      </label>
+      <button className="secondary-button" type="submit">
+        Run Report
+      </button>
+    </form>
+  );
+}
+
+function CompanyInvoicesFilter({
+  end,
+  printDocs,
+  showPaid,
+  start,
+}: {
+  end: Date;
+  printDocs: boolean;
+  showPaid: boolean;
+  start: Date;
+}) {
+  return (
+    <form className="report-filter print-hidden">
+      <label>
+        Start
+        <input name="start" type="date" defaultValue={inputDate(start)} />
+      </label>
+      <label>
+        End
+        <input name="end" type="date" defaultValue={inputDate(end)} />
+      </label>
+      <label className="checkbox-line">
+        <input defaultChecked={showPaid} name="paid" type="checkbox" />
+        Paid invoices
+      </label>
+      <label className="checkbox-line">
+        <input defaultChecked={printDocs} name="docs" type="checkbox" />
+        Print full invoices
       </label>
       <button className="secondary-button" type="submit">
         Run Report
@@ -997,6 +1037,82 @@ function unpaidInvoicesReport(invoices: InvoiceWithDetails[]) {
   );
 }
 
+function companyLabel(invoice: InvoiceWithDetails) {
+  return (
+    invoice.order.companyNameSnapshot ??
+    invoice.order.company?.name ??
+    "Unknown Company"
+  );
+}
+
+function allCompanyInvoicesReport(
+  invoices: InvoiceWithDetails[],
+  showPaid: boolean,
+  printDocs: boolean,
+) {
+  const companyInvoices = invoices
+    .filter((invoice) => invoice.order.isCompanyCar || invoice.order.companyId !== null)
+    .filter((invoice) =>
+      showPaid ? invoice.status === "paid" : invoice.status !== "paid",
+    )
+    .sort((first, second) =>
+      companyLabel(first).localeCompare(companyLabel(second), undefined, {
+        sensitivity: "base",
+      }),
+    );
+  const total = companyInvoices.reduce(
+    (sum, invoice) => sum + decimal(invoice.total),
+    0,
+  );
+  const statusLabel = showPaid ? "Paid" : "Unpaid";
+
+  return (
+    <>
+      <MetricGrid
+        metrics={[
+          { label: `${statusLabel} Company Invoices`, value: String(companyInvoices.length) },
+          { label: `${statusLabel} Total`, value: `$${money(total)}` },
+        ]}
+      />
+      <ReportTable
+        columns={[
+          "Company",
+          "Invoice",
+          "Customer",
+          "Vehicle",
+          "Total",
+          "Created",
+          showPaid ? "Paid" : "Status",
+        ]}
+        rows={companyInvoices.map((invoice) => [
+          companyLabel(invoice),
+          invoice.invoiceNumber,
+          customerName(invoice),
+          vehicleLabel(invoice.vehicle),
+          `$${money(decimal(invoice.total))}`,
+          formatDate(invoice.createdAt),
+          showPaid ? formatDate(invoice.paidAt) : invoice.status,
+        ])}
+      />
+
+      {printDocs && companyInvoices.length > 0 ? (
+        <div className="report-invoice-documents">
+          <p className="report-note print-hidden">
+            {companyInvoices.length} full invoice
+            {companyInvoices.length === 1 ? "" : "s"} below will print on their own
+            pages.
+          </p>
+          {companyInvoices.map((invoice) => (
+            <div className="statement-invoice-page" key={invoice.id}>
+              <InvoiceDocument invoice={invoice} />
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 function customerActivityReport(invoices: InvoiceWithDetails[]) {
   const rows = new Map<
     number,
@@ -1161,6 +1277,8 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
     selectedCompanyIdParam && Number.isInteger(selectedCompanyIdValue)
     ? selectedCompanyIdValue
     : null;
+  const showPaid = search?.paid === "on";
+  const printDocs = search?.docs === "on";
   const invoices = usesDateRange ? await getInvoices(start, end) : [];
   const accountEntries =
     slug === "sales-receipts-summary" ? await getAccountEntries(start, end) : [];
@@ -1199,6 +1317,9 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
   if (slug === "employee-revenue") content = employeeRevenueReport(invoices);
   if (slug === "service-performed") content = servicePerformedReport(invoices);
   if (slug === "unpaid-invoices") content = unpaidInvoicesReport(invoices);
+  if (slug === "all-company-invoices") {
+    content = allCompanyInvoicesReport(invoices, showPaid, printDocs);
+  }
   if (slug === "customer-activity") content = customerActivityReport(invoices);
   if (slug === "vehicle-history") content = await vehicleHistoryReport(search?.q ?? "");
   if (slug === "average-repair-order") content = averageRepairOrderReport(invoices);
@@ -1236,6 +1357,13 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
             companies={companies}
             end={end}
             selectedCompanyId={selectedCompanyId}
+            start={start}
+          />
+        ) : slug === "all-company-invoices" ? (
+          <CompanyInvoicesFilter
+            end={end}
+            printDocs={printDocs}
+            showPaid={showPaid}
             start={start}
           />
         ) : usesDateRange ? (
