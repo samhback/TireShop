@@ -18,6 +18,8 @@ type ReportPageProps = {
     q?: string;
     paid?: string;
     docs?: string;
+    allCompanies?: string;
+    filter?: string;
   }>;
 };
 
@@ -203,18 +205,25 @@ function DateFilter({ end, start }: { end: Date; start: Date }) {
 }
 
 function CompanyInvoicesFilter({
+  allCompanies,
+  companies,
   end,
   printDocs,
+  selectedCompanyId,
   showPaid,
   start,
 }: {
+  allCompanies: boolean;
+  companies: { id: number; name: string }[];
   end: Date;
   printDocs: boolean;
+  selectedCompanyId: number | null;
   showPaid: boolean;
   start: Date;
 }) {
   return (
     <form className="report-filter print-hidden">
+      <input name="filter" type="hidden" value="company-invoices" />
       <label>
         Start
         <input name="start" type="date" defaultValue={inputDate(start)} />
@@ -226,6 +235,21 @@ function CompanyInvoicesFilter({
       <label className="checkbox-line">
         <input defaultChecked={showPaid} name="paid" type="checkbox" />
         Paid invoices
+      </label>
+      <label className="checkbox-line">
+        <input defaultChecked={allCompanies} name="allCompanies" type="checkbox" />
+        All companies
+      </label>
+      <label>
+        Company
+        <select name="companyId" defaultValue={selectedCompanyId?.toString() ?? ""}>
+          <option value="">Choose a company</option>
+          {companies.map((company) => (
+            <option key={company.id} value={company.id}>
+              {company.name}
+            </option>
+          ))}
+        </select>
       </label>
       <label className="checkbox-line">
         <input defaultChecked={printDocs} name="docs" type="checkbox" />
@@ -1049,9 +1073,13 @@ function allCompanyInvoicesReport(
   invoices: InvoiceWithDetails[],
   showPaid: boolean,
   printDocs: boolean,
+  companyFilterId: number | null,
 ) {
   const companyInvoices = invoices
     .filter((invoice) => invoice.order.isCompanyCar || invoice.order.companyId !== null)
+    .filter((invoice) =>
+      companyFilterId === null ? true : invoice.order.companyId === companyFilterId,
+    )
     .filter((invoice) =>
       showPaid ? invoice.status === "paid" : invoice.status !== "paid",
     )
@@ -1279,21 +1307,28 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
     : null;
   const showPaid = search?.paid === "on";
   const printDocs = search?.docs === "on";
+  // The company-invoices filter form always submits a hidden marker, so its
+  // absence means the form was never run and "All companies" defaults on.
+  const companyFilterSubmitted = search?.filter === "company-invoices";
+  const allCompanies = companyFilterSubmitted
+    ? search?.allCompanies === "on"
+    : true;
+  // When limiting to one company, use the dropdown selection; otherwise all.
+  const companyInvoiceFilterId = allCompanies ? null : selectedCompanyId;
   const invoices = usesDateRange ? await getInvoices(start, end) : [];
   const accountEntries =
     slug === "sales-receipts-summary" ? await getAccountEntries(start, end) : [];
-  const companies =
-    slug === "company-profit"
-      ? await prisma.company.findMany({
-          orderBy: {
-            name: "asc",
-          },
-          select: {
-            id: true,
-            name: true,
-          },
-        })
-      : [];
+  const companies = ["company-profit", "all-company-invoices"].includes(slug)
+    ? await prisma.company.findMany({
+        orderBy: {
+          name: "asc",
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+      })
+    : [];
   const companyProfitInvoices =
     selectedCompanyId === null
       ? invoices
@@ -1318,7 +1353,12 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
   if (slug === "service-performed") content = servicePerformedReport(invoices);
   if (slug === "unpaid-invoices") content = unpaidInvoicesReport(invoices);
   if (slug === "all-company-invoices") {
-    content = allCompanyInvoicesReport(invoices, showPaid, printDocs);
+    content = allCompanyInvoicesReport(
+      invoices,
+      showPaid,
+      printDocs,
+      companyInvoiceFilterId,
+    );
   }
   if (slug === "customer-activity") content = customerActivityReport(invoices);
   if (slug === "vehicle-history") content = await vehicleHistoryReport(search?.q ?? "");
@@ -1361,8 +1401,11 @@ export default async function ReportPage({ params, searchParams }: ReportPagePro
           />
         ) : slug === "all-company-invoices" ? (
           <CompanyInvoicesFilter
+            allCompanies={allCompanies}
+            companies={companies}
             end={end}
             printDocs={printDocs}
+            selectedCompanyId={selectedCompanyId}
             showPaid={showPaid}
             start={start}
           />
