@@ -287,6 +287,11 @@ export default async function CompanyPage({
                                 {item.performedByName
                                   ? ` | Performed by ${item.performedByName}`
                                   : ""}
+                                {item.workPerformed ? (
+                                  <span className="company-history-note">
+                                    {item.workPerformed}
+                                  </span>
+                                ) : null}
                               </li>
                             ))}
                           </ul>

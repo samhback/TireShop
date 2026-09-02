@@ -474,6 +474,7 @@ function tireDisposalLines(
     taxable: false,
     taxAmount: 0,
     notes: `For ${item.name}`,
+    workPerformed: null,
     performedByName: null,
   }));
 }
@@ -481,6 +482,7 @@ function tireDisposalLines(
 type QuickInvoiceLineInput = {
   id?: unknown;
   quantity?: unknown;
+  workPerformed?: unknown;
 };
 
 function parseQuickInvoiceLines(value: FormDataEntryValue | null) {
@@ -499,6 +501,10 @@ function parseQuickInvoiceLines(value: FormDataEntryValue | null) {
       .map((line: QuickInvoiceLineInput) => ({
         id: Number(line.id),
         quantity: Number(line.quantity),
+        workPerformed:
+          typeof line.workPerformed === "string" && line.workPerformed.trim()
+            ? line.workPerformed.trim()
+            : null,
       }))
       .filter(
         (line) =>
@@ -508,8 +514,14 @@ function parseQuickInvoiceLines(value: FormDataEntryValue | null) {
           line.quantity > 0,
       );
 
-    return lines.reduce<{ id: number; quantity: number }[]>((merged, line) => {
-      const existingLine = merged.find((item) => item.id === line.id);
+    // Merge on id *and* note: repeat lines of the same item still collapse, but
+    // lines carrying different work notes stay separate so no note is lost.
+    return lines.reduce<
+      { id: number; quantity: number; workPerformed: string | null }[]
+    >((merged, line) => {
+      const existingLine = merged.find(
+        (item) => item.id === line.id && item.workPerformed === line.workPerformed,
+      );
 
       if (existingLine) {
         existingLine.quantity += line.quantity;
@@ -2190,6 +2202,55 @@ export async function updateOrderLineItemAdjustment(formData: FormData) {
   redirect(`/orders/${orderId}?lineUpdated=1`);
 }
 
+export async function updateOrderLineItemWorkPerformed(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const orderId = Number(formData.get("orderId"));
+  const lineItemId = Number(formData.get("lineItemId"));
+
+  if (!Number.isInteger(orderId) || !Number.isInteger(lineItemId)) {
+    redirect(`/orders/${orderId || ""}?error=lineItem`);
+  }
+
+  const lineItem = await prisma.orderLineItem.findUnique({
+    where: {
+      id: lineItemId,
+    },
+    select: {
+      id: true,
+      orderId: true,
+      order: {
+        select: {
+          status: true,
+        },
+      },
+    },
+  });
+
+  if (
+    !lineItem ||
+    lineItem.orderId !== orderId ||
+    ["completed", "canceled"].includes(lineItem.order.status)
+  ) {
+    redirect(`/orders/${orderId}?error=lineItem`);
+  }
+
+  await prisma.orderLineItem.update({
+    where: {
+      id: lineItemId,
+    },
+    data: {
+      workPerformed: nullableValue(formData, "workPerformed"),
+    },
+  });
+
+  redirect(`/orders/${orderId}?lineUpdated=1`);
+}
+
 export async function updateOrderLineItemPerformedBy(formData: FormData) {
   const employee = await getEmployeeSession();
 
@@ -2349,6 +2410,7 @@ export async function completeOrder(formData: FormData) {
       taxAmount: 0,
       lineTotal: lineItem.lineTotal,
       notes: lineItem.notes,
+      workPerformed: lineItem.workPerformed,
       performedByName: lineItem.performedByEmployee?.name ?? null,
     };
   });
@@ -2480,12 +2542,24 @@ export async function createQuickInvoice(formData: FormData) {
     redirect("/invoices/quick?error=invalid");
   }
 
+  // The same item can span several lines when they carry different work notes,
+  // so check stock against the combined quantity rather than line by line.
+  const requestedInventoryQuantities = new Map<number, number>();
+
   for (const inventoryLine of inventoryLines) {
+    requestedInventoryQuantities.set(
+      inventoryLine.id,
+      (requestedInventoryQuantities.get(inventoryLine.id) ?? 0) +
+        inventoryLine.quantity,
+    );
+  }
+
+  for (const [inventoryItemId, requestedQuantity] of requestedInventoryQuantities) {
     const item = inventoryItems.find(
-      (inventoryItem) => inventoryItem.id === inventoryLine.id,
+      (inventoryItem) => inventoryItem.id === inventoryItemId,
     );
 
-    if (!item || item.quantity < inventoryLine.quantity) {
+    if (!item || item.quantity < requestedQuantity) {
       redirect("/invoices/quick?error=inventory");
     }
   }
@@ -2514,6 +2588,7 @@ export async function createQuickInvoice(formData: FormData) {
       taxable: service.taxable,
       taxAmount: 0,
       notes: service.description,
+      workPerformed: line.workPerformed,
       performedByName: null,
     };
   });
@@ -2546,6 +2621,7 @@ export async function createQuickInvoice(formData: FormData) {
         [item.brand, item.partNumber ? `Part # ${item.partNumber}` : null, item.tireSize]
           .filter(Boolean)
           .join(" | ") || null,
+      workPerformed: line.workPerformed,
       performedByName: null,
     };
 
@@ -2609,6 +2685,7 @@ export async function createQuickInvoice(formData: FormData) {
             taxable: lineItem.taxable,
             lineTotal: lineItem.lineTotal,
             notes: lineItem.notes,
+            workPerformed: lineItem.workPerformed,
           })),
         },
       },
@@ -2642,6 +2719,7 @@ export async function createQuickInvoice(formData: FormData) {
             taxAmount: lineItem.taxAmount,
             lineTotal: lineItem.lineTotal,
             notes: lineItem.notes,
+            workPerformed: lineItem.workPerformed,
             performedByName: lineItem.performedByName,
           })),
         },
@@ -2730,6 +2808,64 @@ export async function updateInvoiceLineTaxable(formData: FormData) {
   });
 
   redirect(`/invoices/${invoice.id}?taxableUpdated=1`);
+}
+
+export async function updateInvoiceLineWorkPerformed(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const invoiceId = Number(formData.get("invoiceId"));
+  const lineItemId = Number(formData.get("lineItemId"));
+
+  if (!Number.isInteger(invoiceId) || !Number.isInteger(lineItemId)) {
+    redirect(`/invoices/${invoiceId || ""}?error=workPerformed`);
+  }
+
+  const lineItem = await prisma.invoiceLineItem.findUnique({
+    where: {
+      id: lineItemId,
+    },
+    select: {
+      id: true,
+      invoiceId: true,
+      invoice: {
+        select: {
+          status: true,
+          paidAt: true,
+          companyInvoiceId: true,
+        },
+      },
+    },
+  });
+
+  if (!lineItem || lineItem.invoiceId !== invoiceId) {
+    redirect(`/invoices/${invoiceId}?error=workPerformed`);
+  }
+
+  // Leave the record alone once it has been paid or rolled into a company
+  // statement the customer has already been sent.
+  if (
+    lineItem.invoice.status !== "unpaid" ||
+    lineItem.invoice.paidAt ||
+    lineItem.invoice.companyInvoiceId !== null
+  ) {
+    redirect(`/invoices/${invoiceId}?error=workPerformedLocked`);
+  }
+
+  // Descriptive only, so no invoice totals need recalculating.
+  await prisma.invoiceLineItem.update({
+    where: {
+      id: lineItemId,
+    },
+    data: {
+      workPerformed: nullableValue(formData, "workPerformed"),
+    },
+  });
+
+  redirect(`/invoices/${invoiceId}?workPerformedUpdated=1`);
 }
 
 export async function markInvoicePaid(formData: FormData) {

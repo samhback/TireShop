@@ -4,6 +4,7 @@ import {
   deleteInvoice,
   markInvoicePaid,
   updateInvoiceLineTaxable,
+  updateInvoiceLineWorkPerformed,
 } from "@/app/actions";
 import { DeleteButton } from "@/app/DeleteButton";
 import { prisma } from "@/lib/prisma";
@@ -18,6 +19,7 @@ type InvoicePageProps = {
     created?: string;
     paid?: string;
     taxableUpdated?: string;
+    workPerformedUpdated?: string;
     error?: string;
   }>;
 };
@@ -147,11 +149,23 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
         {paramsValue?.taxableUpdated === "1" ? (
           <p className="success">Line item tax status updated.</p>
         ) : null}
+        {paramsValue?.workPerformedUpdated === "1" ? (
+          <p className="success">Work performed updated.</p>
+        ) : null}
         {paramsValue?.error === "payment" ? (
           <p className="error">Unable to update invoice payment status.</p>
         ) : null}
         {paramsValue?.error === "taxable" ? (
           <p className="error">Unable to update line item tax status.</p>
+        ) : null}
+        {paramsValue?.error === "workPerformed" ? (
+          <p className="error">Unable to update work performed.</p>
+        ) : null}
+        {paramsValue?.error === "workPerformedLocked" ? (
+          <p className="error">
+            Work performed can only be changed on unpaid invoices that are not
+            part of a company statement.
+          </p>
         ) : null}
         {paramsValue?.error === "taxableLocked" ? (
           <p className="error">
@@ -258,6 +272,9 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
                   <span className="role-label">{item.lineType}</span>
                   <h3>{item.description}</h3>
                   {item.notes ? <p>{item.notes}</p> : null}
+                  {item.workPerformed ? (
+                    <p>Work performed: {item.workPerformed}</p>
+                  ) : null}
                   {item.performedByName ? (
                     <p>Performed by {item.performedByName}</p>
                   ) : null}
@@ -297,6 +314,30 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
                             type="checkbox"
                           />
                           Taxable
+                        </label>
+                        <button className="secondary-button" type="submit">
+                          Apply
+                        </button>
+                      </form>
+                    </details>
+                  ) : null}
+                  {canEditTaxable ? (
+                    <details className="line-adjustment-panel">
+                      <summary>Notes</summary>
+                      <form
+                        action={updateInvoiceLineWorkPerformed}
+                        className="line-adjustment-form line-notes-form"
+                        data-preserve-scroll="true"
+                      >
+                        <input name="invoiceId" type="hidden" value={invoice.id} />
+                        <input name="lineItemId" type="hidden" value={item.id} />
+                        <label>
+                          Work Performed
+                          <textarea
+                            defaultValue={item.workPerformed ?? ""}
+                            name="workPerformed"
+                            placeholder="Replaced valve stem, found uneven wear on left rear."
+                          />
                         </label>
                         <button className="secondary-button" type="submit">
                           Apply

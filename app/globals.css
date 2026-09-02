@@ -1309,6 +1309,39 @@ h1 {
   padding: 12px;
 }
 
+.quick-line-note {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.quick-line-note textarea {
+  display: block;
+  width: 100%;
+  min-height: 54px;
+  margin-top: 4px;
+  resize: vertical;
+}
+
+.company-history-note {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.line-notes-form {
+  width: 280px;
+  justify-items: stretch;
+}
+
+.line-notes-form textarea {
+  width: 100%;
+  min-height: 70px;
+  resize: vertical;
+}
+
 .line-adjustment-form label {
   display: grid;
   gap: 4px;
@@ -1781,6 +1814,18 @@ h1 {
   font-style: italic;
   font-weight: 700;
   color: #1b211e;
+}
+
+.statement-linerow td {
+  padding-left: 18px;
+  border-bottom: none;
+}
+
+.statement-line-note {
+  display: block;
+  padding-left: 10px;
+  color: #6b746c;
+  font-style: italic;
 }
 
 .statement-summary {

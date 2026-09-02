@@ -11,6 +11,7 @@ import {
   removeOrderLineItem,
   updateOrderCustomerNotes,
   updateOrderLineItemAdjustment,
+  updateOrderLineItemWorkPerformed,
 } from "@/app/actions";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSession } from "@/lib/session";
@@ -570,6 +571,9 @@ export default async function OrderDetailPage({
                     <span className="role-label">{item.lineType}</span>
                     <h3>{item.description}</h3>
                     {item.notes ? <p>{item.notes}</p> : null}
+                    {item.workPerformed ? (
+                      <p>Work performed: {item.workPerformed}</p>
+                    ) : null}
                     {item.lineType === "service" ? (
                       <PerformedBySelect
                         employees={employees.map((employeeProfile) => ({
@@ -643,6 +647,33 @@ export default async function OrderDetailPage({
                         </form>
                       </details>
                     ) : null}
+                    <details className="line-adjustment-panel">
+                      <summary>Notes</summary>
+                      <form
+                        action={updateOrderLineItemWorkPerformed}
+                        className="line-adjustment-form line-notes-form"
+                        data-preserve-scroll="true"
+                      >
+                        <input name="orderId" type="hidden" value={order.id} />
+                        <input name="lineItemId" type="hidden" value={item.id} />
+                        <label>
+                          Work Performed
+                          <textarea
+                            defaultValue={item.workPerformed ?? ""}
+                            disabled={isOrderLocked}
+                            name="workPerformed"
+                            placeholder="Replaced valve stem, found uneven wear on left rear."
+                          />
+                        </label>
+                        <button
+                          className="secondary-button"
+                          disabled={isOrderLocked}
+                          type="submit"
+                        >
+                          Apply
+                        </button>
+                      </form>
+                    </details>
                     <form action={removeOrderLineItem} data-preserve-scroll="true">
                       <input name="orderId" type="hidden" value={order.id} />
                       <input name="lineItemId" type="hidden" value={item.id} />

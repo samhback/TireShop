@@ -237,6 +237,7 @@ model OrderLineItem {
   taxable               Boolean          @default(true)
   lineTotal             Decimal          @map("line_total") @db.Decimal(10, 2)
   notes                 String?
+  workPerformed         String?          @map("work_performed")
   createdAt             DateTime         @default(now()) @map("created_at")
   updatedAt             DateTime         @updatedAt @map("updated_at")
 
@@ -323,6 +324,7 @@ model InvoiceLineItem {
   taxAmount       Decimal  @default(0) @map("tax_amount") @db.Decimal(10, 2)
   lineTotal       Decimal  @map("line_total") @db.Decimal(10, 2)
   notes           String?
+  workPerformed   String?  @map("work_performed")
   performedByName String?  @map("performed_by_name")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")

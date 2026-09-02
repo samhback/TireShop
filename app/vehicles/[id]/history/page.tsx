@@ -138,6 +138,9 @@ export default async function VehicleHistoryPage({ params }: VehicleHistoryPageP
                         <span className="role-label">{item.lineType}</span>
                         <h3>{item.description}</h3>
                         {item.notes ? <p>{item.notes}</p> : null}
+                        {item.workPerformed ? (
+                          <p>Work performed: {item.workPerformed}</p>
+                        ) : null}
                         {item.performedByName ? (
                           <p>Performed by {item.performedByName}</p>
                         ) : null}

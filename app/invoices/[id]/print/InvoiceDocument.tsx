@@ -113,6 +113,9 @@ export function InvoiceDocument({ invoice }: { invoice: InvoiceForDocument }) {
               <td>
                 <strong>{item.description}</strong>
                 {item.notes ? <span>{item.notes}</span> : null}
+                {item.workPerformed ? (
+                  <span>Work performed: {item.workPerformed}</span>
+                ) : null}
                 {item.performedByName ? (
                   <span>Performed by {item.performedByName}</span>
                 ) : null}

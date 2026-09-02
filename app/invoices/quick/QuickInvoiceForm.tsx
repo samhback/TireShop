@@ -45,6 +45,7 @@ type InventoryOption = {
 type QuickLine = {
   id: number;
   quantity: number;
+  workPerformed: string;
 };
 
 type QuickServiceLine = {
@@ -52,6 +53,7 @@ type QuickServiceLine = {
   manualHours: boolean;
   units: number;
   hours: number;
+  workPerformed: string;
 };
 
 type QuickInvoiceFormProps = {
@@ -163,6 +165,7 @@ export function QuickInvoiceForm({
         manualHours: false,
         units: 1,
         hours: estimatedHoursPerUnit(service),
+        workPerformed: "",
       },
     ]);
   }
@@ -180,6 +183,7 @@ export function QuickInvoiceForm({
       {
         id: item.id,
         quantity: 1,
+        workPerformed: "",
       },
     ]);
   }
@@ -195,10 +199,10 @@ export function QuickInvoiceForm({
     );
   }
 
-  function updateInventoryLine(index: number, quantity: number) {
+  function updateInventoryLine(index: number, changes: Partial<QuickLine>) {
     setInventoryLines((lines) =>
       lines.map((line, lineIndex) =>
-        lineIndex === index ? { ...line, quantity } : line,
+        lineIndex === index ? { ...line, ...changes } : line,
       ),
     );
   }
@@ -252,7 +256,13 @@ export function QuickInvoiceForm({
               return [];
             }
 
-            return [{ id: line.id, quantity: finalServiceQuantity(service, line) }];
+            return [
+              {
+                id: line.id,
+                quantity: finalServiceQuantity(service, line),
+                workPerformed: line.workPerformed,
+              },
+            ];
           }),
         )}
       />
@@ -361,6 +371,18 @@ export function QuickInvoiceForm({
                           ? ` | Est. ${service.estimatedHours} hr`
                           : ""}
                       </p>
+                      <label className="quick-line-note">
+                        Work Performed
+                        <textarea
+                          onChange={(event) =>
+                            updateServiceLine(index, {
+                              workPerformed: event.target.value,
+                            })
+                          }
+                          placeholder="What was done on this line."
+                          value={line.workPerformed}
+                        />
+                      </label>
                     </div>
                     <div className="inline-qty-form service-add-form">
                       {isHourly ? (
@@ -478,6 +500,18 @@ export function QuickInvoiceForm({
                         </p>
                       ) : null}
                       <p>{inventoryLabel(item)}</p>
+                      <label className="quick-line-note">
+                        Work Performed
+                        <textarea
+                          onChange={(event) =>
+                            updateInventoryLine(index, {
+                              workPerformed: event.target.value,
+                            })
+                          }
+                          placeholder="What was done on this line."
+                          value={line.workPerformed}
+                        />
+                      </label>
                     </div>
                     <div className="inline-qty-form">
                       <label>
@@ -486,7 +520,9 @@ export function QuickInvoiceForm({
                           max={item.quantity}
                           min="1"
                           onChange={(event) =>
-                            updateInventoryLine(index, Number(event.target.value))
+                            updateInventoryLine(index, {
+                              quantity: Number(event.target.value),
+                            })
                           }
                           step="1"
                           type="number"

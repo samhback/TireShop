@@ -177,6 +177,18 @@ export default async function StatementPrintPage({
                       INV Balance Due : ${amount(invoice.total)}
                     </td>
                   </tr>
+                  {invoice.lineItems.map((item) => (
+                    <tr className="statement-subrow statement-linerow" key={item.id}>
+                      <td colSpan={7}>
+                        {item.description}
+                        {item.workPerformed ? (
+                          <span className="statement-line-note">
+                            {item.workPerformed}
+                          </span>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               );
             })}

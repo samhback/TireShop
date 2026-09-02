@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
@@ -216,19 +217,33 @@ export default async function CompanyStatementPage({
               </thead>
               <tbody>
                 {statement.invoices.map((invoice) => (
-                  <tr key={invoice.id}>
-                    <td>
-                      <Link href={`/invoices/${invoice.id}`}>
-                        {invoice.invoiceNumber}
-                      </Link>
-                    </td>
-                    <td>{formatDate(invoice.createdAt)}</td>
-                    <td>{vehicleLabel(invoice.vehicle)}</td>
-                    <td>${money(invoiceParts(invoice.lineItems))}</td>
-                    <td>${money(invoiceLabor(invoice.lineItems))}</td>
-                    <td>${money(invoice.taxAmount)}</td>
-                    <td>${money(invoice.total)}</td>
-                  </tr>
+                  <Fragment key={invoice.id}>
+                    <tr>
+                      <td>
+                        <Link href={`/invoices/${invoice.id}`}>
+                          {invoice.invoiceNumber}
+                        </Link>
+                      </td>
+                      <td>{formatDate(invoice.createdAt)}</td>
+                      <td>{vehicleLabel(invoice.vehicle)}</td>
+                      <td>${money(invoiceParts(invoice.lineItems))}</td>
+                      <td>${money(invoiceLabor(invoice.lineItems))}</td>
+                      <td>${money(invoice.taxAmount)}</td>
+                      <td>${money(invoice.total)}</td>
+                    </tr>
+                    {invoice.lineItems.map((item) => (
+                      <tr className="statement-linerow" key={item.id}>
+                        <td colSpan={7}>
+                          {item.description}
+                          {item.workPerformed ? (
+                            <span className="statement-line-note">
+                              {item.workPerformed}
+                            </span>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ))}
+                  </Fragment>
                 ))}
               </tbody>
               <tfoot>

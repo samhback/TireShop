@@ -175,6 +175,9 @@ export default async function QuotePage({ params }: QuotePageProps) {
                 <td>
                   <strong>{item.description}</strong>
                   {item.notes ? <span>{item.notes}</span> : null}
+                  {item.workPerformed ? (
+                    <span>Work performed: {item.workPerformed}</span>
+                  ) : null}
                 </td>
                 <td>{money(item.quantity)}</td>
                 <td>${money(item.unitPrice)}</td>
