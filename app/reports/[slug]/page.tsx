@@ -124,7 +124,13 @@ function vehicleLabel(vehicle: InvoiceWithDetails["vehicle"]) {
     return "No vehicle";
   }
 
-  return [vehicle.color, vehicle.year, vehicle.make, vehicle.model]
+  return [
+    vehicle.color,
+    vehicle.year,
+    vehicle.make,
+    vehicle.model,
+    vehicle.unitNumber ? `Unit ${vehicle.unitNumber}` : null,
+  ]
     .filter(Boolean)
     .join(" ");
 }
@@ -1185,7 +1191,7 @@ async function vehicleHistoryReport(query: string) {
     return (
       <div className="empty-state">
         <h2>Search vehicle history</h2>
-        <p>Type at least 2 characters to search by customer, vehicle, plate, VIN, or invoice.</p>
+        <p>Type at least 2 characters to search by customer, vehicle, unit number, plate, VIN, or invoice.</p>
       </div>
     );
   }
@@ -1207,6 +1213,7 @@ async function vehicleHistoryReport(query: string) {
               { make: contains },
               { model: contains },
               { vin: contains },
+              { unitNumber: contains },
               { licensePlate: contains },
             ],
           },

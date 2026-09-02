@@ -23,6 +23,7 @@ function vehicleLabel(vehicle: {
   year: string;
   make: string;
   model: string;
+  unitNumber: string | null;
   color: string | null;
   licensePlate: string | null;
   vin: string | null;
@@ -32,6 +33,7 @@ function vehicleLabel(vehicle: {
     vehicle.year,
     vehicle.make,
     vehicle.model,
+    vehicle.unitNumber ? `Unit ${vehicle.unitNumber}` : null,
     vehicle.licensePlate ? `Plate ${vehicle.licensePlate}` : null,
     vehicle.vin ? `VIN ${vehicle.vin}` : null,
   ]
@@ -96,6 +98,12 @@ export default async function VehicleHistoryPage({ params }: VehicleHistoryPageP
 
         <p className="eyebrow">Vehicle History</p>
         <h1>{vehicleLabel(vehicle)}</h1>
+        <Link
+          className="secondary-link-button"
+          href={`/vehicles/${vehicle.id}/edit`}
+        >
+          Edit Vehicle
+        </Link>
         <p className="helper">
           Work history for {vehicle.customer.firstName} {vehicle.customer.lastName}.
         </p>

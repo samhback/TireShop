@@ -2,7 +2,10 @@
   "mcpServers": {
     "roblox-studio": {
       "command": "npx",
-      "args": ["-y", "robloxstudio-mcp@latest"]
+      "args": ["-y", "robloxstudio-mcp@latest"],
+      "env": {
+        "ROBLOX_STUDIO_PORT": "58742"
+      }
     }
   }
 }

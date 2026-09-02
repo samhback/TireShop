@@ -36,7 +36,7 @@ export function OrderCustomerSearch() {
           autoComplete="off"
           autoFocus
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search customer name, phone, vehicle, plate, or VIN..."
+          placeholder="Search customer name, phone, vehicle, unit number, plate, or VIN..."
           value={query}
         />
       </div>
@@ -77,6 +77,9 @@ export function OrderCustomerSearch() {
                         vehicle.year,
                         vehicle.make,
                         vehicle.model,
+                        vehicle.unitNumber
+                          ? `Unit ${vehicle.unitNumber}`
+                          : null,
                         vehicle.licensePlate ? `Plate ${vehicle.licensePlate}` : null,
                       ]
                         .filter(Boolean)

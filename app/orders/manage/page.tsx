@@ -38,6 +38,7 @@ export default async function ManageOrdersPage() {
           make: order.vehicle.make,
           model: order.vehicle.model,
           color: order.vehicle.color,
+          unitNumber: order.vehicle.unitNumber,
           licensePlate: order.vehicle.licensePlate,
         }
       : null,
@@ -57,7 +58,7 @@ export default async function ManageOrdersPage() {
         <p className="eyebrow">Manage Orders</p>
         <h1>Manage Orders</h1>
         <p className="helper">
-          Find saved drafts by order number, customer, vehicle, color, plate, or VIN.
+          Find saved drafts by order number, customer, vehicle, unit number, color, plate, or VIN.
         </p>
 
         <OrderSearch defaultOrders={defaultOrders} />

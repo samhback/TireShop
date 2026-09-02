@@ -48,6 +48,7 @@ function vehicleLabel(vehicle: {
   year: string;
   make: string;
   model: string;
+  unitNumber: string | null;
   color: string | null;
   licensePlate: string | null;
   tireSize: string | null;
@@ -57,6 +58,7 @@ function vehicleLabel(vehicle: {
     vehicle.year,
     vehicle.make,
     vehicle.model,
+    vehicle.unitNumber ? `Unit ${vehicle.unitNumber}` : null,
     vehicle.licensePlate ? `Plate ${vehicle.licensePlate}` : null,
     vehicle.tireSize ? `Tires ${vehicle.tireSize}` : null,
   ]
@@ -497,6 +499,12 @@ export default async function OrderDetailPage({
                           Vehicle History
                         </Link>
                       ) : null}
+                      <Link
+                        className="secondary-link-button"
+                        href={`/vehicles/${vehicle.id}/edit`}
+                      >
+                        Edit Vehicle
+                      </Link>
                       {order.vehicleId === vehicle.id ? (
                         <span className="attached-label">Attached</span>
                       ) : (

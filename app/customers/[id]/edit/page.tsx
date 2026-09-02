@@ -418,17 +418,26 @@ export default async function EditCustomerPage({
                   <h3>
                     {vehicle.year} {vehicle.make} {vehicle.model}
                   </h3>
-                  {vehicle._count.invoices > 0 ? (
+                  <div className="vehicle-card-actions">
+                    {vehicle._count.invoices > 0 ? (
+                      <Link
+                        className="secondary-link-button"
+                        href={`/vehicles/${vehicle.id}/history`}
+                      >
+                        Vehicle History
+                      </Link>
+                    ) : null}
                     <Link
                       className="secondary-link-button"
-                      href={`/vehicles/${vehicle.id}/history`}
+                      href={`/vehicles/${vehicle.id}/edit`}
                     >
-                      Vehicle History
+                      Edit Vehicle
                     </Link>
-                  ) : null}
+                  </div>
                 </div>
                 <p>
                   {[
+                    vehicle.unitNumber ? `Unit ${vehicle.unitNumber}` : null,
                     vehicle.licensePlate ? `Plate ${vehicle.licensePlate}` : null,
                     vehicle.vin ? `VIN ${vehicle.vin}` : null,
                     vehicle.mileage ? `${vehicle.mileage} miles` : null,

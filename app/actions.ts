@@ -1137,6 +1137,7 @@ export async function createCustomer(formData: FormData) {
           model,
           trim: nullableValue(formData, "trim"),
           vin: nullableValue(formData, "vin"),
+          unitNumber: nullableValue(formData, "unitNumber"),
           licensePlate: nullableValue(formData, "licensePlate"),
           plateState: nullableValue(formData, "plateState"),
           color: nullableValue(formData, "color"),
@@ -1197,6 +1198,7 @@ export async function searchCustomers(query: string) {
               { make: contains },
               { model: contains },
               { vin: contains },
+              { unitNumber: contains },
               { licensePlate: contains },
               { color: contains },
               { engineSize: contains },
@@ -1249,6 +1251,7 @@ export async function searchCustomers(query: string) {
       make: vehicle.make,
       model: vehicle.model,
       vin: vehicle.vin,
+      unitNumber: vehicle.unitNumber,
       licensePlate: vehicle.licensePlate,
       color: vehicle.color,
       mileage: vehicle.mileage,
@@ -1396,6 +1399,7 @@ export async function createVehicleForOrder(formData: FormData) {
       model,
       trim: nullableValue(formData, "trim"),
       vin: nullableValue(formData, "vin"),
+      unitNumber: nullableValue(formData, "unitNumber"),
       licensePlate: nullableValue(formData, "licensePlate"),
       plateState: nullableValue(formData, "plateState"),
       color: nullableValue(formData, "color"),
@@ -1605,6 +1609,7 @@ export async function searchOrders(query: string) {
               { model: contains },
               { color: contains },
               { vin: contains },
+              { unitNumber: contains },
               { licensePlate: contains },
               { tireSize: contains },
             ],
@@ -1638,6 +1643,7 @@ export async function searchOrders(query: string) {
           make: order.vehicle.make,
           model: order.vehicle.model,
           color: order.vehicle.color,
+          unitNumber: order.vehicle.unitNumber,
           licensePlate: order.vehicle.licensePlate,
         }
       : null,
@@ -1690,6 +1696,7 @@ export async function searchInvoices(query: string) {
               { model: contains },
               { color: contains },
               { vin: contains },
+              { unitNumber: contains },
               { licensePlate: contains },
               { tireSize: contains },
             ],
@@ -1728,6 +1735,7 @@ export async function searchInvoices(query: string) {
           make: invoice.vehicle.make,
           model: invoice.vehicle.model,
           color: invoice.vehicle.color,
+          unitNumber: invoice.vehicle.unitNumber,
           licensePlate: invoice.vehicle.licensePlate,
         }
       : null,
@@ -2944,6 +2952,7 @@ export async function addCustomerVehicle(formData: FormData) {
       model,
       trim: nullableValue(formData, "trim"),
       vin: nullableValue(formData, "vin"),
+      unitNumber: nullableValue(formData, "unitNumber"),
       licensePlate: nullableValue(formData, "licensePlate"),
       plateState: nullableValue(formData, "plateState"),
       color: nullableValue(formData, "color"),
@@ -2959,6 +2968,58 @@ export async function addCustomerVehicle(formData: FormData) {
   });
 
   redirect(`/customers/${customerId}/edit?vehicleAdded=1`);
+}
+
+export async function updateVehicle(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const vehicleId = Number(formData.get("vehicleId"));
+  const year = String(formData.get("year") ?? "").trim();
+  const make = String(formData.get("make") ?? "").trim();
+  const model = String(formData.get("model") ?? "").trim();
+  const mileageValue = String(formData.get("mileage") ?? "").trim();
+  const mileage = mileageValue ? Number(mileageValue) : null;
+
+  if (
+    !Number.isInteger(vehicleId) ||
+    !year ||
+    !make ||
+    !model ||
+    (mileage !== null && (!Number.isInteger(mileage) || mileage < 0))
+  ) {
+    redirect(`/vehicles/${vehicleId || ""}/edit?error=vehicle`);
+  }
+
+  await prisma.vehicle.update({
+    where: {
+      id: vehicleId,
+    },
+    data: {
+      year,
+      make,
+      model,
+      trim: nullableValue(formData, "trim"),
+      vin: nullableValue(formData, "vin"),
+      unitNumber: nullableValue(formData, "unitNumber"),
+      licensePlate: nullableValue(formData, "licensePlate"),
+      plateState: nullableValue(formData, "plateState"),
+      color: nullableValue(formData, "color"),
+      mileage,
+      engineSize: nullableValue(formData, "engineSize"),
+      transmissionType: nullableValue(formData, "transmissionType"),
+      transmissionDetails: nullableValue(formData, "transmissionDetails"),
+      fuelType: nullableValue(formData, "fuelType"),
+      driveType: nullableValue(formData, "driveType"),
+      tireSize: nullableValue(formData, "tireSize"),
+      notes: nullableValue(formData, "vehicleNotes"),
+    },
+  });
+
+  redirect(`/vehicles/${vehicleId}/edit?updated=1`);
 }
 
 export async function deleteInvoice(formData: FormData) {

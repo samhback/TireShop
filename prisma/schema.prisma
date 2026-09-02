@@ -156,6 +156,7 @@ model Vehicle {
   model               String
   trim                String?
   vin                 String?
+  unitNumber          String?   @map("unit_number")
   licensePlate        String?   @map("license_plate")
   plateState          String?   @map("plate_state")
   color               String?
@@ -176,6 +177,7 @@ model Vehicle {
   @@index([customerId])
   @@index([vin])
   @@index([licensePlate])
+  @@index([unitNumber])
   @@map("vehicles")
 }
 

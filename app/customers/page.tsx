@@ -52,6 +52,7 @@ export default async function CustomersPage() {
       make: vehicle.make,
       model: vehicle.model,
       vin: vehicle.vin,
+      unitNumber: vehicle.unitNumber,
       licensePlate: vehicle.licensePlate,
       color: vehicle.color,
       mileage: vehicle.mileage,

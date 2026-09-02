@@ -40,7 +40,7 @@ export default async function OrdersPage() {
             </span>
             <span className="dashboard-card-text">
               <strong>Manage Orders</strong>
-              <span>Search by customer, vehicle, plate, or order number.</span>
+              <span>Search by customer, vehicle, unit number, plate, or order number.</span>
             </span>
           </Link>
         </div>

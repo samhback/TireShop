@@ -81,6 +81,7 @@ export function CustomerSearch({ defaultCustomers = [] }: CustomerSearchProps) {
                     <div className="vehicle-list-row" key={vehicle.id}>
                       <span>
                         {vehicle.year} {vehicle.make} {vehicle.model}
+                        {vehicle.unitNumber ? ` | Unit ${vehicle.unitNumber}` : ""}
                         {vehicle.licensePlate ? ` | ${vehicle.licensePlate}` : ""}
                         {vehicle.tireSize ? ` | ${vehicle.tireSize}` : ""}
                       </span>

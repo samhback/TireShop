@@ -18,6 +18,7 @@ function vehicleLabel(vehicle: {
   year: string;
   make: string;
   model: string;
+  unitNumber: string | null;
   color: string | null;
   licensePlate: string | null;
   vin: string | null;
@@ -27,6 +28,7 @@ function vehicleLabel(vehicle: {
     vehicle.year,
     vehicle.make,
     vehicle.model,
+    vehicle.unitNumber ? `Unit ${vehicle.unitNumber}` : null,
     vehicle.licensePlate ? `Plate ${vehicle.licensePlate}` : null,
     vehicle.vin ? `VIN ${vehicle.vin}` : null,
   ]

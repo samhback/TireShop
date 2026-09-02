@@ -34,7 +34,7 @@ export default async function SearchCustomerPage({
         <p className="eyebrow">Search Customer</p>
         <h1>Find Customer</h1>
         <p className="helper">
-          Search by name, phone, email, VIN, plate, vehicle, or tire size.
+          Search by name, phone, email, VIN, unit number, plate, vehicle, or tire size.
         </p>
 
         {query?.deleted === "1" ? (

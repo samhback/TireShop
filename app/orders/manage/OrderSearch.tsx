@@ -28,6 +28,7 @@ function vehicleText(order: OrderSearchResult) {
     order.vehicle.year,
     order.vehicle.make,
     order.vehicle.model,
+    order.vehicle.unitNumber ? `Unit ${order.vehicle.unitNumber}` : null,
     order.vehicle.licensePlate ? `Plate ${order.vehicle.licensePlate}` : null,
   ]
     .filter(Boolean)
@@ -63,7 +64,7 @@ export function OrderSearch({ defaultOrders }: OrderSearchProps) {
           autoComplete="off"
           autoFocus
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search orders by customer, vehicle, plate, VIN, or order number..."
+          placeholder="Search orders by customer, vehicle, unit number, plate, VIN, or order number..."
           value={query}
         />
       </div>
@@ -110,7 +111,7 @@ export function OrderSearch({ defaultOrders }: OrderSearchProps) {
       ) : (
         <div className="empty-state">
           <h2>No matching orders</h2>
-          <p>Try searching by customer, vehicle, plate, VIN, or order number.</p>
+          <p>Try searching by customer, vehicle, unit number, plate, VIN, or order number.</p>
         </div>
       )}
     </div>

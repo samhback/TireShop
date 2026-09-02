@@ -24,6 +24,7 @@ function vehicleLabel(vehicle: InvoiceForDocument["vehicle"]) {
     vehicle.year,
     vehicle.make,
     vehicle.model,
+    vehicle.unitNumber ? `Unit ${vehicle.unitNumber}` : null,
     vehicle.licensePlate ? `Plate ${vehicle.licensePlate}` : null,
     vehicle.vin ? `VIN ${vehicle.vin}` : null,
   ]

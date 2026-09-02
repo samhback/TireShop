@@ -30,13 +30,21 @@ function vehicleLabel(vehicle: {
   year: string;
   make: string;
   model: string;
+  unitNumber: string | null;
   color: string | null;
 } | null) {
   if (!vehicle) {
     return "No vehicle";
   }
 
-  return [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ");
+  return [
+    vehicle.unitNumber ? `Unit ${vehicle.unitNumber}` : null,
+    vehicle.year,
+    vehicle.make,
+    vehicle.model,
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 export default async function CompanyStatementPage({

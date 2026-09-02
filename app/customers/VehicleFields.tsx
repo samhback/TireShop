@@ -8,7 +8,27 @@ import {
   transmissionTypeOptions,
 } from "@/lib/vehicleOptions";
 
+type VehicleDefaults = {
+  year?: string;
+  make?: string;
+  model?: string;
+  trim?: string | null;
+  vin?: string | null;
+  unitNumber?: string | null;
+  licensePlate?: string | null;
+  plateState?: string | null;
+  color?: string | null;
+  mileage?: number | null;
+  engineSize?: string | null;
+  transmissionType?: string | null;
+  transmissionDetails?: string | null;
+  fuelType?: string | null;
+  driveType?: string | null;
+  tireSize?: string | null;
+};
+
 type VehicleFieldsProps = {
+  defaults?: VehicleDefaults;
   idPrefix?: string;
 };
 
@@ -16,43 +36,80 @@ function fieldId(idPrefix: string, name: string) {
   return idPrefix ? `${idPrefix}-${name}` : name;
 }
 
-export function VehicleFields({ idPrefix = "" }: VehicleFieldsProps) {
+export function VehicleFields({ defaults, idPrefix = "" }: VehicleFieldsProps) {
   return (
     <>
       <div className="field">
         <label htmlFor={fieldId(idPrefix, "year")}>Year</label>
-        <input id={fieldId(idPrefix, "year")} name="year" required />
+        <input
+          defaultValue={defaults?.year ?? ""}
+          id={fieldId(idPrefix, "year")}
+          name="year"
+          required
+        />
       </div>
 
       <div className="field">
         <label htmlFor={fieldId(idPrefix, "make")}>Make</label>
-        <input id={fieldId(idPrefix, "make")} name="make" required />
+        <input
+          defaultValue={defaults?.make ?? ""}
+          id={fieldId(idPrefix, "make")}
+          name="make"
+          required
+        />
       </div>
 
       <div className="field">
         <label htmlFor={fieldId(idPrefix, "model")}>Model</label>
-        <input id={fieldId(idPrefix, "model")} name="model" required />
+        <input
+          defaultValue={defaults?.model ?? ""}
+          id={fieldId(idPrefix, "model")}
+          name="model"
+          required
+        />
       </div>
 
       <div className="field">
         <label htmlFor={fieldId(idPrefix, "trim")}>Trim</label>
-        <input id={fieldId(idPrefix, "trim")} name="trim" />
+        <input
+          defaultValue={defaults?.trim ?? ""}
+          id={fieldId(idPrefix, "trim")}
+          name="trim"
+        />
+      </div>
+
+      <div className="field">
+        <label htmlFor={fieldId(idPrefix, "unitNumber")}>Unit Number</label>
+        <input
+          defaultValue={defaults?.unitNumber ?? ""}
+          id={fieldId(idPrefix, "unitNumber")}
+          name="unitNumber"
+          placeholder="T-104"
+        />
       </div>
 
       <div className="field">
         <label htmlFor={fieldId(idPrefix, "vin")}>VIN</label>
-        <input id={fieldId(idPrefix, "vin")} name="vin" />
+        <input
+          defaultValue={defaults?.vin ?? ""}
+          id={fieldId(idPrefix, "vin")}
+          name="vin"
+        />
       </div>
 
       <div className="field">
         <label htmlFor={fieldId(idPrefix, "licensePlate")}>License Plate</label>
-        <input id={fieldId(idPrefix, "licensePlate")} name="licensePlate" />
+        <input
+          defaultValue={defaults?.licensePlate ?? ""}
+          id={fieldId(idPrefix, "licensePlate")}
+          name="licensePlate"
+        />
       </div>
 
       <div className="field">
         <label htmlFor={fieldId(idPrefix, "plateState")}>Plate State</label>
         <select
-          defaultValue="OK"
+          defaultValue={defaults?.plateState ?? "OK"}
           id={fieldId(idPrefix, "plateState")}
           name="plateState"
         >
@@ -66,7 +123,11 @@ export function VehicleFields({ idPrefix = "" }: VehicleFieldsProps) {
 
       <div className="field">
         <label htmlFor={fieldId(idPrefix, "color")}>Color</label>
-        <select id={fieldId(idPrefix, "color")} name="color">
+        <select
+          defaultValue={defaults?.color ?? ""}
+          id={fieldId(idPrefix, "color")}
+          name="color"
+        >
           {colorOptions.map((color) => (
             <option key={color} value={color === "Unknown" ? "" : color}>
               {color}
@@ -78,6 +139,7 @@ export function VehicleFields({ idPrefix = "" }: VehicleFieldsProps) {
       <div className="field">
         <label htmlFor={fieldId(idPrefix, "mileage")}>Mileage</label>
         <input
+          defaultValue={defaults?.mileage ?? ""}
           id={fieldId(idPrefix, "mileage")}
           min="0"
           name="mileage"
@@ -88,6 +150,7 @@ export function VehicleFields({ idPrefix = "" }: VehicleFieldsProps) {
       <div className="field">
         <label htmlFor={fieldId(idPrefix, "engineSize")}>Engine</label>
         <input
+          defaultValue={defaults?.engineSize ?? ""}
           id={fieldId(idPrefix, "engineSize")}
           list={fieldId(idPrefix, "engineOptions")}
           name="engineSize"
@@ -105,6 +168,7 @@ export function VehicleFields({ idPrefix = "" }: VehicleFieldsProps) {
           Transmission Type
         </label>
         <select
+          defaultValue={defaults?.transmissionType ?? ""}
           id={fieldId(idPrefix, "transmissionType")}
           name="transmissionType"
         >
@@ -121,6 +185,7 @@ export function VehicleFields({ idPrefix = "" }: VehicleFieldsProps) {
           Transmission Details
         </label>
         <input
+          defaultValue={defaults?.transmissionDetails ?? ""}
           id={fieldId(idPrefix, "transmissionDetails")}
           list={fieldId(idPrefix, "transmissionDetailOptions")}
           name="transmissionDetails"
@@ -135,7 +200,11 @@ export function VehicleFields({ idPrefix = "" }: VehicleFieldsProps) {
 
       <div className="field">
         <label htmlFor={fieldId(idPrefix, "fuelType")}>Fuel Type</label>
-        <select id={fieldId(idPrefix, "fuelType")} name="fuelType">
+        <select
+          defaultValue={defaults?.fuelType ?? ""}
+          id={fieldId(idPrefix, "fuelType")}
+          name="fuelType"
+        >
           {fuelTypeOptions.map((type) => (
             <option key={type} value={type === "Unknown" ? "" : type}>
               {type}
@@ -146,7 +215,11 @@ export function VehicleFields({ idPrefix = "" }: VehicleFieldsProps) {
 
       <div className="field">
         <label htmlFor={fieldId(idPrefix, "driveType")}>Drive Type</label>
-        <select id={fieldId(idPrefix, "driveType")} name="driveType">
+        <select
+          defaultValue={defaults?.driveType ?? ""}
+          id={fieldId(idPrefix, "driveType")}
+          name="driveType"
+        >
           {driveTypeOptions.map((type) => (
             <option key={type} value={type === "Unknown" ? "" : type}>
               {type}
@@ -158,6 +231,7 @@ export function VehicleFields({ idPrefix = "" }: VehicleFieldsProps) {
       <div className="field">
         <label htmlFor={fieldId(idPrefix, "tireSize")}>Tire Size</label>
         <input
+          defaultValue={defaults?.tireSize ?? ""}
           id={fieldId(idPrefix, "tireSize")}
           name="tireSize"
           placeholder="245/60R18"

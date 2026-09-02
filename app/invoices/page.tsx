@@ -52,6 +52,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
           make: invoice.vehicle.make,
           model: invoice.vehicle.model,
           color: invoice.vehicle.color,
+          unitNumber: invoice.vehicle.unitNumber,
           licensePlate: invoice.vehicle.licensePlate,
         }
       : null,

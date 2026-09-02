@@ -32,6 +32,9 @@ function vehicleText(invoice: InvoiceSearchResult) {
     invoice.vehicle.year,
     invoice.vehicle.make,
     invoice.vehicle.model,
+    invoice.vehicle.unitNumber
+      ? `Unit ${invoice.vehicle.unitNumber}`
+      : null,
     invoice.vehicle.licensePlate ? `Plate ${invoice.vehicle.licensePlate}` : null,
   ]
     .filter(Boolean)
@@ -69,7 +72,7 @@ export function InvoiceList({ defaultInvoices }: InvoiceListProps) {
           autoComplete="off"
           autoFocus
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search invoices by customer, vehicle, plate, invoice, or order number..."
+          placeholder="Search invoices by customer, vehicle, unit number, plate, invoice, or order number..."
           value={query}
         />
       </div>
@@ -127,7 +130,7 @@ export function InvoiceList({ defaultInvoices }: InvoiceListProps) {
       ) : (
         <div className="empty-state">
           <h2>No matching invoices</h2>
-          <p>Try searching by customer, vehicle, plate, invoice, or order number.</p>
+          <p>Try searching by customer, vehicle, unit number, plate, invoice, or order number.</p>
         </div>
       )}
     </div>

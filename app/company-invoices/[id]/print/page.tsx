@@ -38,6 +38,7 @@ function vehicleUnit(vehicle: {
   year: string;
   make: string;
   model: string;
+  unitNumber: string | null;
   trim: string | null;
   vin: string | null;
 } | null) {
@@ -46,6 +47,7 @@ function vehicleUnit(vehicle: {
   }
 
   return [
+    vehicle.unitNumber ? `Unit ${vehicle.unitNumber}` : null,
     [vehicle.year, vehicle.make, vehicle.model, vehicle.trim]
       .filter(Boolean)
       .join(" "),
