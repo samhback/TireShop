@@ -1828,6 +1828,26 @@ h1 {
   font-style: italic;
 }
 
+.statement-filter-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.statement-pastdue {
+  margin-top: 14px;
+  border-top: 2px solid #1b211e;
+}
+
+.statement-pastdue thead th {
+  padding-top: 8px;
+  text-align: left;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
 .statement-summary {
   display: flex;
   justify-content: space-between;

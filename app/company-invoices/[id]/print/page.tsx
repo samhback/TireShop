@@ -2,7 +2,15 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSession } from "@/lib/session";
 import { SHOP } from "@/lib/shop";
-import { agingBucket, invoiceLabor, invoiceParts } from "@/lib/statement";
+import {
+  agingBucket,
+  decimal,
+  fetchPastDueInvoices,
+  groupPastDueByStatement,
+  invoiceLabor,
+  invoiceParts,
+  pastDueTotal,
+} from "@/lib/statement";
 import { InvoiceDocument } from "@/app/invoices/[id]/print/InvoiceDocument";
 import { PrintButton } from "./PrintButton";
 
@@ -97,10 +105,20 @@ export default async function StatementPrintPage({
     notFound();
   }
 
+  const pastDueInvoices = await fetchPastDueInvoices(
+    statement.companyId,
+    statement,
+  );
+  const pastDue = pastDueTotal(pastDueInvoices);
+  const pastDueGroups = groupPastDueByStatement(pastDueInvoices);
+  const balanceDue = decimal(statement.total) + pastDue;
+
+  // Age everything still owed, not just this statement's invoices — otherwise
+  // the +30/+60/+90 columns always read zero no matter how far behind they are.
   const aging = { current: 0, d30: 0, d60: 0, d90: 0 };
-  for (const invoice of statement.invoices) {
+  for (const invoice of [...statement.invoices, ...pastDueInvoices]) {
     const bucket = agingBucket(invoice.createdAt, statement.statementDate);
-    aging[bucket] += Number(invoice.total.toString());
+    aging[bucket] += decimal(invoice.total);
   }
 
   return (
@@ -194,6 +212,45 @@ export default async function StatementPrintPage({
             })}
         </table>
 
+        {pastDueGroups.length > 0 ? (
+          <table className="statement-table statement-pastdue">
+            <thead>
+              <tr>
+                <th colSpan={7}>PAST DUE — PREVIOUSLY BILLED, STILL OUTSTANDING</th>
+              </tr>
+            </thead>
+            {pastDueGroups.map((group) => (
+              <tbody
+                className="statement-invoice-group"
+                key={group.statementId ?? "unbilled"}
+              >
+                <tr className="statement-subrow">
+                  <td colSpan={7}>
+                    {group.statementDate
+                      ? `Statement ${statementDate(group.statementDate)}`
+                      : "Not yet on a statement"}
+                  </td>
+                </tr>
+                {group.invoices.map((invoice) => (
+                  <tr className="statement-row" key={invoice.id}>
+                    <td>{invoice.invoiceNumber}</td>
+                    <td>{invoiceDate(invoice.createdAt)}</td>
+                    <td colSpan={4}>Past due</td>
+                    <td className="statement-num">{amount(invoice.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            ))}
+            <tbody>
+              <tr className="statement-subrow">
+                <td className="statement-balance" colSpan={7}>
+                  Total Past Due : ${amount(pastDue)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        ) : null}
+
         <div className="statement-summary">
           <div className="statement-aging">
             <div className="statement-aging-row statement-aging-head">
@@ -215,9 +272,15 @@ export default async function StatementPrintPage({
               <span>Total Invoice(s) :</span>
               <strong>{amount(statement.total)}</strong>
             </div>
+            {pastDue > 0 ? (
+              <div>
+                <span>Past Due :</span>
+                <strong>{amount(pastDue)}</strong>
+              </div>
+            ) : null}
             <div className="statement-balance-due">
               <span>Total Balance Due :</span>
-              <strong>$ {amount(statement.total)}</strong>
+              <strong>$ {amount(balanceDue)}</strong>
             </div>
           </div>
         </div>

@@ -8,7 +8,14 @@ import {
 import { DeleteButton } from "@/app/DeleteButton";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSession } from "@/lib/session";
-import { invoiceLabor, invoiceParts } from "@/lib/statement";
+import {
+  decimal,
+  fetchPastDueInvoices,
+  groupPastDueByStatement,
+  invoiceLabor,
+  invoiceParts,
+  pastDueTotal,
+} from "@/lib/statement";
 
 type StatementPageProps = {
   params: Promise<{ id: string }>;
@@ -83,6 +90,14 @@ export default async function CompanyStatementPage({
   if (!statement) {
     notFound();
   }
+
+  const pastDueInvoices = await fetchPastDueInvoices(
+    statement.companyId,
+    statement,
+  );
+  const pastDue = pastDueTotal(pastDueInvoices);
+  const pastDueGroups = groupPastDueByStatement(pastDueInvoices);
+  const balanceDue = decimal(statement.total) + pastDue;
 
   const query = await searchParams;
   const isPaid = statement.status === "paid";
@@ -167,7 +182,13 @@ export default async function CompanyStatementPage({
 
           <article className="order-summary-card">
             <span>Total Balance Due</span>
-            <h2>${money(statement.total)}</h2>
+            <h2>${money(balanceDue)}</h2>
+            {pastDue > 0 ? (
+              <p>
+                This statement: ${money(statement.total)} | Past due: $
+                {money(pastDue)}
+              </p>
+            ) : null}
             <p>Tax included: ${money(statement.taxAmount)}</p>
           </article>
         </div>
@@ -248,13 +269,67 @@ export default async function CompanyStatementPage({
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={6}>Total Balance Due</td>
+                  <td colSpan={6}>This Statement</td>
                   <td>${money(statement.total)}</td>
                 </tr>
               </tfoot>
             </table>
           </div>
         </div>
+
+        {pastDueGroups.length > 0 ? (
+          <div className="form-section">
+            <h2>Past Due</h2>
+            <p className="helper">
+              Previously billed and still unpaid. These are not part of this
+              statement&apos;s total but are included in the balance due.
+            </p>
+            <div className="report-table-wrap">
+              <table className="report-table">
+                <thead>
+                  <tr>
+                    <th>Invoice</th>
+                    <th>Date</th>
+                    <th>From Statement</th>
+                    <th>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pastDueGroups.map((group) =>
+                    group.invoices.map((invoice) => (
+                      <tr key={invoice.id}>
+                        <td>
+                          <Link href={`/invoices/${invoice.id}`}>
+                            {invoice.invoiceNumber}
+                          </Link>
+                        </td>
+                        <td>{formatDate(invoice.createdAt)}</td>
+                        <td>
+                          {group.statementId ? (
+                            <Link href={`/company-invoices/${group.statementId}`}>
+                              {group.statementDate
+                                ? formatDate(group.statementDate)
+                                : `Statement ${group.statementId}`}
+                            </Link>
+                          ) : (
+                            "Not on a statement"
+                          )}
+                        </td>
+                        <td>${money(invoice.total)}</td>
+                      </tr>
+                    )),
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={3}>Total Past Due</td>
+                    <td>${money(pastDue)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        ) : null}
 
         <div className="form-section">
           <div className="section-heading-row">

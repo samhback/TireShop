@@ -32,6 +32,11 @@ export default async function CompanyInvoicesPage({
 
   const query = await searchParams;
   const selectedCompanyId = query?.companyId ?? "";
+  // Only filter on a real company id; a junk param should fall back to the
+  // full list rather than silently returning nothing.
+  const filterCompanyId = Number(selectedCompanyId);
+  const hasCompanyFilter =
+    Boolean(selectedCompanyId) && Number.isInteger(filterCompanyId);
 
   const [companies, statements] = await Promise.all([
     prisma.company.findMany({
@@ -39,14 +44,21 @@ export default async function CompanyInvoicesPage({
       select: { id: true, name: true },
     }),
     prisma.companyInvoice.findMany({
+      where: hasCompanyFilter ? { companyId: filterCompanyId } : {},
       include: {
         company: { select: { name: true } },
         _count: { select: { invoices: true } },
       },
-      orderBy: { createdAt: "desc" },
-      take: 50,
+      orderBy: { statementDate: "desc" },
+      // One company's full history should be reachable; the unfiltered feed
+      // stays capped so the page does not grow unbounded.
+      take: hasCompanyFilter ? 200 : 50,
     }),
   ]);
+
+  // Flag statements still unpaid a month after they were cut, so the ones the
+  // bookkeeper is chasing stand out in the list.
+  const pastDueBefore = new Date(Date.now() - 30 * 86400000);
 
   return (
     <main className="placeholder-shell">
@@ -128,13 +140,44 @@ export default async function CompanyInvoicesPage({
         </div>
 
         <div className="form-section service-preview">
-          <h2>Recent Statements</h2>
+          <div className="section-heading-row">
+            <h2>
+              {hasCompanyFilter
+                ? `Statements for ${
+                    companies.find((company) => company.id === filterCompanyId)
+                      ?.name ?? "Company"
+                  }`
+                : "Recent Statements"}
+            </h2>
+            <form className="statement-filter-form" method="get">
+              <label htmlFor="statementCompanyFilter">Company</label>
+              <select
+                defaultValue={selectedCompanyId}
+                id="statementCompanyFilter"
+                name="companyId"
+              >
+                <option value="">All companies</option>
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+              <button className="secondary-button" type="submit">
+                Filter
+              </button>
+            </form>
+          </div>
           {statements.length > 0 ? (
             <div className="search-results">
               {statements.map((statement) => (
                 <article className="search-result-card" key={statement.id}>
                   <div>
                     <span className="role-label">{statement.status}</span>
+                    {statement.status !== "paid" &&
+                    statement.statementDate < pastDueBefore ? (
+                      <span className="line-badge">Past due</span>
+                    ) : null}
                     <h2>{statement.company.name}</h2>
                     <p>
                       {statement._count.invoices} invoice
