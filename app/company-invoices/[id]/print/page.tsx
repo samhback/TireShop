@@ -5,6 +5,7 @@ import { SHOP } from "@/lib/shop";
 import {
   agingBucket,
   decimal,
+  fetchInvoiceDocuments,
   fetchPastDueInvoices,
   groupPastDueByStatement,
   invoiceLabor,
@@ -112,6 +113,13 @@ export default async function StatementPrintPage({
   const pastDue = pastDueTotal(pastDueInvoices);
   const pastDueGroups = groupPastDueByStatement(pastDueInvoices);
   const balanceDue = decimal(statement.total) + pastDue;
+
+  // The "statement + invoices" print appends a copy of every invoice being
+  // billed, so the past due ones belong there too — otherwise the customer gets
+  // a page of past due numbers with no backup to check them against.
+  const pastDueDocuments = withInvoices
+    ? await fetchInvoiceDocuments(pastDueInvoices.map((invoice) => invoice.id))
+    : [];
 
   // Age everything still owed, not just this statement's invoices — otherwise
   // the +30/+60/+90 columns always read zero no matter how far behind they are.
@@ -304,6 +312,13 @@ export default async function StatementPrintPage({
             </div>
           ))
         : null}
+
+      {pastDueDocuments.map((invoice) => (
+        <div className="statement-invoice-page" key={invoice.id}>
+          <p className="statement-pastdue-stamp">PAST DUE</p>
+          <InvoiceDocument invoice={invoice} />
+        </div>
+      ))}
     </main>
   );
 }

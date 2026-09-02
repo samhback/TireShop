@@ -88,6 +88,32 @@ export type PastDueInvoice = Awaited<
   ReturnType<typeof fetchPastDueInvoices>
 >[number];
 
+// Full invoice payloads for InvoiceDocument. Kept separate from
+// fetchPastDueInvoices so the statement pages only pay for line items and
+// relations when the caller actually prints the invoice copies.
+export async function fetchInvoiceDocuments(invoiceIds: number[]) {
+  if (invoiceIds.length === 0) {
+    return [];
+  }
+
+  return prisma.invoice.findMany({
+    where: {
+      id: {
+        in: invoiceIds,
+      },
+    },
+    include: {
+      customer: true,
+      vehicle: true,
+      order: { include: { quotedByEmployee: true } },
+      lineItems: { orderBy: { createdAt: "asc" } },
+    },
+    orderBy: {
+      createdAt: "asc",
+    },
+  });
+}
+
 export function pastDueTotal(invoices: PastDueInvoice[]) {
   return invoices.reduce((sum, invoice) => sum + decimal(invoice.total), 0);
 }
