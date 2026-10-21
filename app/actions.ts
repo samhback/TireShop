@@ -11,6 +11,7 @@ import {
 import { getInventoryCategory } from "@/lib/inventoryCategories";
 import { defaultInventorySalesCategory, salesCategoryOptions } from "@/lib/salesCategories";
 import { normalizeUsername } from "@/lib/usernames";
+import { parseInvoiceDate } from "@/lib/invoiceDate";
 import {
   REGULAR_TIRE_DISPOSAL_DESCRIPTION,
   SEMI_TIRE_DISPOSAL_DESCRIPTION,
@@ -1734,6 +1735,7 @@ export async function searchInvoices(query: string) {
     status: invoice.status,
     total: invoice.total.toString(),
     createdAt: invoice.createdAt.toISOString(),
+    invoiceDate: invoice.invoiceDate?.toISOString() ?? null,
     paidAt: invoice.paidAt?.toISOString() ?? null,
     paidByUsername: invoice.paidByUsername,
     customer: {
@@ -2728,6 +2730,35 @@ export async function createQuickInvoice(formData: FormData) {
   });
 
   redirect(`/invoices/${invoice.id}?created=1`);
+}
+
+export async function updateInvoiceDate(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const invoiceId = Number(formData.get("invoiceId"));
+  if (!Number.isSafeInteger(invoiceId) || invoiceId <= 0) {
+    redirect("/invoices");
+  }
+
+  const date = parseInvoiceDate(String(formData.get("invoiceDate") ?? ""));
+  if (!date) {
+    redirect(`/invoices/${invoiceId}?error=date`);
+  }
+
+  const result = await prisma.invoice.updateMany({
+    where: { id: invoiceId },
+    data: { invoiceDate: date },
+  });
+
+  if (result.count === 0) {
+    redirect(`/invoices/${invoiceId}?error=date`);
+  }
+
+  redirect(`/invoices/${invoiceId}?dateUpdated=1`);
 }
 
 export async function updateInvoiceLineTaxable(formData: FormData) {

@@ -8,6 +8,7 @@ import {
 import { DeleteButton } from "@/app/DeleteButton";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSession } from "@/lib/session";
+import { formatInvoiceDate } from "@/lib/invoiceDate";
 import {
   decimal,
   fetchPastDueInvoices,
@@ -245,7 +246,7 @@ export default async function CompanyStatementPage({
                           {invoice.invoiceNumber}
                         </Link>
                       </td>
-                      <td>{formatDate(invoice.createdAt)}</td>
+                      <td>{formatInvoiceDate(invoice, { dateStyle: "medium" })}</td>
                       <td>{vehicleLabel(invoice.vehicle)}</td>
                       <td>${money(invoiceParts(invoice.lineItems))}</td>
                       <td>${money(invoiceLabor(invoice.lineItems))}</td>
@@ -303,7 +304,7 @@ export default async function CompanyStatementPage({
                             {invoice.invoiceNumber}
                           </Link>
                         </td>
-                        <td>{formatDate(invoice.createdAt)}</td>
+                        <td>{formatInvoiceDate(invoice, { dateStyle: "medium" })}</td>
                         <td>
                           {group.statementId ? (
                             <Link href={`/company-invoices/${group.statementId}`}>

@@ -268,6 +268,7 @@ model Invoice {
   paidByUsername         String?                @map("paid_by_username")
   lineItems              InvoiceLineItem[]
   payments               Payment[]
+  invoiceDate            DateTime?              @map("invoice_date") @db.Date
   createdAt              DateTime               @default(now()) @map("created_at")
   updatedAt              DateTime               @updatedAt @map("updated_at")
   customerAccountEntries CustomerAccountEntry[]

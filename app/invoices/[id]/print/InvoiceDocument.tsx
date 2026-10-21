@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { formatTaxRatePercent } from "@/lib/tax";
+import { formatInvoiceDate } from "@/lib/invoiceDate";
 
 type InvoiceForDocument = Prisma.InvoiceGetPayload<{
   include: {
@@ -33,11 +34,6 @@ function vehicleLabel(vehicle: InvoiceForDocument["vehicle"]) {
 }
 
 export function InvoiceDocument({ invoice }: { invoice: InvoiceForDocument }) {
-  const generatedAt = new Intl.DateTimeFormat("en-US", {
-    dateStyle: "long",
-    timeStyle: "short",
-  }).format(new Date());
-
   return (
     <section className="quote-document">
       <header className="quote-header">
@@ -50,8 +46,8 @@ export function InvoiceDocument({ invoice }: { invoice: InvoiceForDocument }) {
           <p>{invoice.invoiceNumber}</p>
         </div>
         <div className="quote-meta">
-          <span>Generated</span>
-          <strong>{generatedAt}</strong>
+          <span>Invoice Date</span>
+          <strong>{formatInvoiceDate(invoice)}</strong>
           <span>Status</span>
           <strong>{invoice.status}</strong>
           {invoice.paidAt ? (

@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSession } from "@/lib/session";
 import { SHOP } from "@/lib/shop";
+import { formatInvoiceDate, invoiceDateInputValue } from "@/lib/invoiceDate";
 import {
   agingBucket,
   decimal,
@@ -30,14 +31,6 @@ function amount(value: { toString(): string } | number) {
 function statementDate(value: Date) {
   return new Intl.DateTimeFormat("en-US", {
     month: "2-digit",
-    day: "2-digit",
-    year: "numeric",
-  }).format(value);
-}
-
-function invoiceDate(value: Date) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
     day: "2-digit",
     year: "numeric",
   }).format(value);
@@ -125,7 +118,10 @@ export default async function StatementPrintPage({
   // the +30/+60/+90 columns always read zero no matter how far behind they are.
   const aging = { current: 0, d30: 0, d60: 0, d90: 0 };
   for (const invoice of [...statement.invoices, ...pastDueInvoices]) {
-    const bucket = agingBucket(invoice.createdAt, statement.statementDate);
+    const bucket = agingBucket(
+      new Date(`${invoiceDateInputValue(invoice)}T00:00:00.000Z`),
+      statement.statementDate,
+    );
     aging[bucket] += decimal(invoice.total);
   }
 
@@ -186,7 +182,7 @@ export default async function StatementPrintPage({
               <tbody key={invoice.id} className="statement-invoice-group">
                   <tr className="statement-row">
                     <td>{invoice.invoiceNumber}</td>
-                    <td>{invoiceDate(invoice.createdAt)}</td>
+                    <td>{formatInvoiceDate(invoice, { month: "short", day: "2-digit", year: "numeric" })}</td>
                     <td />
                     <td className="statement-num">
                       {parts > 0 ? amount(parts) : ""}
@@ -242,7 +238,7 @@ export default async function StatementPrintPage({
                 {group.invoices.map((invoice) => (
                   <tr className="statement-row" key={invoice.id}>
                     <td>{invoice.invoiceNumber}</td>
-                    <td>{invoiceDate(invoice.createdAt)}</td>
+                    <td>{formatInvoiceDate(invoice, { month: "short", day: "2-digit", year: "numeric" })}</td>
                     <td colSpan={4}>Past due</td>
                     <td className="statement-num">{amount(invoice.total)}</td>
                   </tr>

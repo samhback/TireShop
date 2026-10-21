@@ -554,6 +554,30 @@ h1 {
   font-size: 18px;
 }
 
+.invoice-date-section {
+  margin-top: 22px;
+}
+
+.invoice-date-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0 8px;
+}
+
+.invoice-date-form label {
+  font-weight: 700;
+}
+
+.invoice-date-form input {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font: inherit;
+}
+
 .section-heading-row {
   display: flex;
   align-items: center;

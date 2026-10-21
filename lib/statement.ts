@@ -58,9 +58,10 @@ export async function fetchPastDueInvoices(
       companyInvoiceId: {
         not: statement.id,
       },
-      createdAt: {
-        lte: statement.statementDate,
-      },
+      OR: [
+        { invoiceDate: { lte: statement.statementDate } },
+        { invoiceDate: null, createdAt: { lte: statement.statementDate } },
+      ],
       order: {
         companyId,
         isCompanyCar: true,
@@ -69,6 +70,7 @@ export async function fetchPastDueInvoices(
     select: {
       id: true,
       invoiceNumber: true,
+      invoiceDate: true,
       createdAt: true,
       total: true,
       companyInvoice: {

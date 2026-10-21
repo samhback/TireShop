@@ -39,6 +39,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
     status: invoice.status,
     total: invoice.total.toString(),
     createdAt: invoice.createdAt.toISOString(),
+    invoiceDate: invoice.invoiceDate?.toISOString() ?? null,
     paidAt: invoice.paidAt?.toISOString() ?? null,
     paidByUsername: invoice.paidByUsername,
     customer: {

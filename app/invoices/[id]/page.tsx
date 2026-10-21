@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import {
   deleteInvoice,
   markInvoicePaid,
+  updateInvoiceDate,
   updateInvoiceLineTaxable,
   updateInvoiceLineWorkPerformed,
 } from "@/app/actions";
@@ -10,6 +11,7 @@ import { DeleteButton } from "@/app/DeleteButton";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSession } from "@/lib/session";
 import { formatTaxRatePercent } from "@/lib/tax";
+import { formatInvoiceDate, invoiceDateInputValue } from "@/lib/invoiceDate";
 
 type InvoicePageProps = {
   params: Promise<{
@@ -18,6 +20,7 @@ type InvoicePageProps = {
   searchParams?: Promise<{
     created?: string;
     paid?: string;
+    dateUpdated?: string;
     taxableUpdated?: string;
     workPerformedUpdated?: string;
     error?: string;
@@ -146,6 +149,12 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
         {paramsValue?.paid === "1" ? (
           <p className="success">Invoice marked as paid.</p>
         ) : null}
+        {paramsValue?.dateUpdated === "1" ? (
+          <p className="success">Invoice date updated.</p>
+        ) : null}
+        {paramsValue?.error === "date" ? (
+          <p className="error">Enter a valid invoice date.</p>
+        ) : null}
         {paramsValue?.taxableUpdated === "1" ? (
           <p className="success">Line item tax status updated.</p>
         ) : null}
@@ -241,6 +250,24 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
               </form>
             )}
           </article>
+        </div>
+
+        <div className="form-section invoice-date-section">
+          <h2>Invoice Date</h2>
+          <p className="helper">This date appears in the top right of the printed invoice.</p>
+          <form action={updateInvoiceDate} className="invoice-date-form">
+            <input name="invoiceId" type="hidden" value={invoice.id} />
+            <label htmlFor="invoice-date">Date</label>
+            <input
+              defaultValue={invoiceDateInputValue(invoice)}
+              id="invoice-date"
+              name="invoiceDate"
+              required
+              type="date"
+            />
+            <button className="secondary-button" type="submit">Save Date</button>
+          </form>
+          <p className="helper">Current invoice date: {formatInvoiceDate(invoice)}</p>
         </div>
 
         {invoice.customer.accountEntries.length > 0 ? (

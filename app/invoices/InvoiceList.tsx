@@ -4,6 +4,7 @@ import { Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { searchInvoices } from "@/app/actions";
+import { formatInvoiceDate } from "@/lib/invoiceDate";
 
 type InvoiceSearchResult = Awaited<ReturnType<typeof searchInvoices>>[number];
 
@@ -114,8 +115,11 @@ export function InvoiceList({ defaultInvoices }: InvoiceListProps) {
                   <strong>${money(invoice.total)}</strong>
                 </span>
                 <span>
-                  Created
-                  <strong>{formatDate(invoice.createdAt)}</strong>
+                  Invoice Date
+                  <strong>{formatInvoiceDate({
+                    invoiceDate: invoice.invoiceDate ? new Date(invoice.invoiceDate) : null,
+                    createdAt: new Date(invoice.createdAt),
+                  }, { dateStyle: "medium" })}</strong>
                 </span>
                 {invoice.paidAt ? (
                   <span>
