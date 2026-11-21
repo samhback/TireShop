@@ -2763,3 +2763,18 @@ h1 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.legal-panel h2 {
+  margin: 28px 0 8px;
+  font-size: 19px;
+}
+
+.legal-panel p,
+.legal-panel li {
+  color: var(--foreground);
+  line-height: 1.6;
+}
+
+.legal-panel ul {
+  padding-left: 22px;
+}
