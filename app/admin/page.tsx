@@ -77,6 +77,23 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </div>
         </div>
 
+        <div className="form-section">
+          <div className="section-heading-row">
+            <div>
+              <h2>Database Backup</h2>
+              <p className="helper">
+                Download a complete copy of every customer, vehicle, order,
+                invoice, payment, and inventory record as one JSON file. Keep
+                it somewhere safe outside this app (it includes employee
+                logins).
+              </p>
+            </div>
+            <a className="secondary-link-button" href="/api/admin/backup">
+              Download Backup
+            </a>
+          </div>
+        </div>
+
         {params?.created === "1" ? (
           <p className="success">Employee account created.</p>
         ) : null}
