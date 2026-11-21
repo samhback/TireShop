@@ -140,6 +140,8 @@ model Customer {
   createdAt              DateTime               @default(now()) @map("created_at")
   updatedAt              DateTime               @updatedAt @map("updated_at")
   payments               Payment[]
+  qboCustomerId          String?                @map("qbo_customer_id")
+  qboRealmId             String?                @map("qbo_realm_id")
 
   @@index([companyId])
   @@index([lastName])
@@ -272,6 +274,10 @@ model Invoice {
   createdAt              DateTime               @default(now()) @map("created_at")
   updatedAt              DateTime               @updatedAt @map("updated_at")
   customerAccountEntries CustomerAccountEntry[]
+  qboInvoiceId           String?                @map("qbo_invoice_id")
+  qboRealmId             String?                @map("qbo_realm_id")
+  qboSyncedAt            DateTime?              @map("qbo_synced_at")
+  qboSyncError           String?                @map("qbo_sync_error")
 
   @@index([invoiceNumber])
   @@index([customerId])
@@ -383,4 +389,39 @@ model CustomerAccountEntry {
   @@index([entryType])
   @@index([entryDate])
   @@map("customer-account-entries")
+}
+
+// One QuickBooks Online OAuth connection per environment (sandbox for local
+// testing, production for Logan's real company). Local dev and the deployed app
+// share this database, so keying by environment keeps sandbox testing from
+// replacing the production connection.
+model QuickBooksConnection {
+  id                    Int      @id @default(autoincrement())
+  environment           String   @unique
+  realmId               String   @map("realm_id")
+  accessToken           String   @map("access_token")
+  refreshToken          String   @map("refresh_token")
+  accessTokenExpiresAt  DateTime @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime @map("refresh_token_expires_at")
+  connectedBy           String?  @map("connected_by")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("quickbooks-connections")
+}
+
+// qboCustomerId / qboInvoiceId above are only valid for the QBO company whose
+// realm id is stored next to them; a different realm treats them as unset.
+
+// Cache of the QBO Product/Service used for each sales category.
+model QuickBooksItem {
+  id            Int      @id @default(autoincrement())
+  realmId       String   @map("realm_id")
+  salesCategory String   @map("sales_category")
+  qboItemId     String   @map("qbo_item_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@unique([realmId, salesCategory])
+  @@map("quickbooks-items")
 }

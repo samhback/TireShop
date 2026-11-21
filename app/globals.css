@@ -2778,3 +2778,10 @@ h1 {
 .legal-panel ul {
   padding-left: 22px;
 }
+
+.quickbooks-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}

@@ -1,4 +1,6 @@
 import { cookies } from "next/headers";
+import { prisma } from "@/lib/prisma";
+import { normalizeUsername } from "@/lib/usernames";
 
 const SESSION_COOKIE = "hsc_employee";
 
@@ -22,4 +24,19 @@ export async function getEmployeeSession() {
 export async function clearEmployeeSession() {
   const cookieStore = await cookies();
   cookieStore.delete(SESSION_COOKIE);
+}
+
+export async function getAdminSession() {
+  const username = await getEmployeeSession();
+
+  if (!username) {
+    return null;
+  }
+
+  const employee = await prisma.employeeLogin.findUnique({
+    where: { username: normalizeUsername(username) },
+    select: { isAdmin: true },
+  });
+
+  return employee?.isAdmin ? username : null;
 }

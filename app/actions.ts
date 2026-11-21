@@ -12,6 +12,7 @@ import { getInventoryCategory } from "@/lib/inventoryCategories";
 import { defaultInventorySalesCategory, salesCategoryOptions } from "@/lib/salesCategories";
 import { normalizeUsername } from "@/lib/usernames";
 import { parseInvoiceDate } from "@/lib/invoiceDate";
+import { pushInvoiceToQuickBooks } from "@/lib/quickbooks";
 import {
   REGULAR_TIRE_DISPOSAL_DESCRIPTION,
   SEMI_TIRE_DISPOSAL_DESCRIPTION,
@@ -3554,4 +3555,27 @@ export async function deleteCompanyStatement(formData: FormData) {
   });
 
   redirect("/company-invoices?deleted=1");
+}
+
+export async function sendInvoiceToQuickBooks(formData: FormData) {
+  const employee = await getEmployeeSession();
+
+  if (!employee) {
+    redirect("/");
+  }
+
+  const invoiceId = Number(formData.get("invoiceId"));
+
+  if (!Number.isInteger(invoiceId)) {
+    redirect("/invoices");
+  }
+
+  const result = await pushInvoiceToQuickBooks(invoiceId);
+
+  if (result.ok) {
+    redirect(`/invoices/${invoiceId}?qbo=sent`);
+  }
+
+  // The error message itself is saved on the invoice and shown on the page.
+  redirect(`/invoices/${invoiceId}?qbo=${result.notConnected ? "notConnected" : "error"}`);
 }

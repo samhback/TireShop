@@ -3,13 +3,16 @@ import { notFound, redirect } from "next/navigation";
 import {
   deleteInvoice,
   markInvoicePaid,
+  sendInvoiceToQuickBooks,
   updateInvoiceDate,
   updateInvoiceLineTaxable,
   updateInvoiceLineWorkPerformed,
 } from "@/app/actions";
 import { DeleteButton } from "@/app/DeleteButton";
 import { prisma } from "@/lib/prisma";
-import { getEmployeeSession } from "@/lib/session";
+import { getAdminSession, getEmployeeSession } from "@/lib/session";
+import { getQuickBooksConnection, quickBooksConfigured } from "@/lib/quickbooks";
+import { QuickBooksSubmitButton } from "./QuickBooksSubmitButton";
 import { formatTaxRatePercent } from "@/lib/tax";
 import { formatInvoiceDate, invoiceDateInputValue } from "@/lib/invoiceDate";
 
@@ -23,6 +26,7 @@ type InvoicePageProps = {
     dateUpdated?: string;
     taxableUpdated?: string;
     workPerformedUpdated?: string;
+    qbo?: string;
     error?: string;
   }>;
 };
@@ -107,6 +111,14 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
   }
 
   const paramsValue = await searchParams;
+  const [qboConnection, isAdmin] = await Promise.all([
+    getQuickBooksConnection(),
+    getAdminSession(),
+  ]);
+  // Ids saved against a different QBO company (e.g. sandbox testing) don't count.
+  const sentToQuickBooks =
+    Boolean(invoice.qboInvoiceId && invoice.qboSyncedAt) &&
+    invoice.qboRealmId === qboConnection?.realmId;
   const isPaid = invoice.status === "paid";
   // Taxability can only be edited before payment and before the invoice is
   // rolled into a company statement.
@@ -182,6 +194,28 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
             a company statement.
           </p>
         ) : null}
+        {paramsValue?.qbo === "sent" ? (
+          <p className="success">Invoice sent to QuickBooks.</p>
+        ) : null}
+        {paramsValue?.qbo === "connected" ? (
+          <p className="success">QuickBooks connected.</p>
+        ) : null}
+        {paramsValue?.qbo === "error" || paramsValue?.qbo === "notConnected" ? (
+          <p className="error">
+            {invoice.qboSyncError
+              ? `QuickBooks: ${invoice.qboSyncError}`
+              : "Unable to send to QuickBooks."}
+          </p>
+        ) : null}
+        {paramsValue?.qbo === "connectFailed" ? (
+          <p className="error">QuickBooks connection was not completed. Try again.</p>
+        ) : null}
+        {paramsValue?.qbo === "adminOnly" ? (
+          <p className="error">Only an admin can connect QuickBooks.</p>
+        ) : null}
+        {paramsValue?.qbo === "notConfigured" ? (
+          <p className="error">QuickBooks keys are not set up on the server yet.</p>
+        ) : null}
         {paramsValue?.error === "delete" ? (
           <p className="error">Unable to delete this invoice.</p>
         ) : null}
@@ -250,6 +284,46 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
               </form>
             )}
           </article>
+        </div>
+
+        <div className="form-section">
+          <div className="section-heading-row">
+            <div>
+              <h2>QuickBooks</h2>
+              <p className="helper">
+                {sentToQuickBooks && invoice.qboSyncedAt
+                  ? `Last sent to QuickBooks ${formatDateTime(invoice.qboSyncedAt)}. Sending again updates the same QuickBooks invoice.`
+                  : qboConnection
+                    ? "Copy this invoice, its customer, and its line items into QuickBooks Online."
+                    : isAdmin
+                      ? "Connect the shop's QuickBooks Online company to send invoices."
+                      : "QuickBooks is not connected yet. Ask an admin to connect it."}
+              </p>
+              {invoice.qboSyncError && !paramsValue?.qbo ? (
+                <p className="error">Last attempt failed: {invoice.qboSyncError}</p>
+              ) : null}
+            </div>
+            <div className="quickbooks-actions">
+            {qboConnection ? (
+              <form action={sendInvoiceToQuickBooks}>
+                <input name="invoiceId" type="hidden" value={invoice.id} />
+                <QuickBooksSubmitButton
+                  label={sentToQuickBooks ? "Resend to QuickBooks" : "Send to QuickBooks"}
+                />
+              </form>
+            ) : null}
+            {(!qboConnection || paramsValue?.qbo === "notConnected") &&
+            isAdmin &&
+            quickBooksConfigured() ? (
+              <a
+                className="secondary-link-button"
+                href={`/api/quickbooks/connect?returnTo=/invoices/${invoice.id}`}
+              >
+                {qboConnection ? "Reconnect QuickBooks" : "Connect QuickBooks"}
+              </a>
+            ) : null}
+            </div>
+          </div>
         </div>
 
         <div className="form-section invoice-date-section">
